@@ -40,7 +40,7 @@ jobs:
           git clone https://gitlab.com/OrangeFox/sync.git . >> ~/sync_output.log 2>&1
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox >> ~/sync_output.log 2>&1
 
-      - name: Inject Device Tree & Patch BoardConfig
+      - name: Inject Device Tree & Patch Configs
         id: inject
         run: |
           echo "=== 2. TAHAP INJECT DEVICE TREE & PATCH CONFIG ===" > ~/inject_output.log
@@ -48,7 +48,6 @@ jobs:
           cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/ >> ~/inject_output.log 2>&1
           echo "Device tree berhasil disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
 
-          # Otomatis cari BoardConfig.mk dan tambahkan BOARD_KERNEL_IMAGE_NAME jika belum ada
           BOARD_CONFIG=$(find ~/orangefox/device/infinix/X6855 -name "BoardConfig.mk" | head -n 1)
           if [ -n "$BOARD_CONFIG" ]; then
             echo "BoardConfig.mk ditemukan di: $BOARD_CONFIG" >> ~/inject_output.log
@@ -61,7 +60,21 @@ jobs:
               echo "BOARD_KERNEL_IMAGE_NAME sudah ada di BoardConfig.mk" >> ~/inject_output.log
             fi
           else
-            echo "PERINGATAN: File BoardConfig.mk tidak ditemukan di direktori device tree!" >> ~/inject_output.log
+            echo "PERINGATAN: File BoardConfig.mk tidak ditemukan!" >> ~/inject_output.log
+          fi
+
+          VENDORSETUP=$(find ~/orangefox/device/infinix/X6855 -name "vendorsetup.sh" | head -n 1)
+          if [ -n "$VENDORSETUP" ]; then
+            echo "vendorsetup.sh ditemukan di: $VENDORSETUP" >> ~/inject_output.log
+            sed -i 's/add_lunch_combo/# add_lunch_combo/g' "$VENDORSETUP"
+            echo "Berhasil menonaktifkan add_lunch_combo yang obsolete di vendorsetup.sh" >> ~/inject_output.log
+            
+            PRODUCT_MK_DIR=$(dirname "$VENDORSETUP")
+            ANDROID_PRODUCTS="$PRODUCT_MK_DIR/AndroidProducts.mk"
+            if [ ! -f "$ANDROID_PRODUCTS" ]; then
+              echo "Membuat AndroidProducts.mk otomatis..." >> ~/inject_output.log
+              printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$ANDROID_PRODUCTS"
+            fi
           fi
 
       - name: Compile OrangeFox
@@ -78,16 +91,14 @@ jobs:
           source build/envsetup.sh >> ~/compile_output.log 2>&1
 
           echo "-> Menjalankan perintah lunch..." >> ~/compile_output.log
-          lunch fox_X6855-eng >> ~/compile_output.log 2>&1 || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1
+          lunch fox_X6855-eng >> ~/compile_output.log 2>&1 || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1 || lunch omni_X6855-eng >> ~/compile_output.log 2>&1 || lunch omni_X6855-userdebug >> ~/compile_output.log 2>&1
 
           echo "-> Memulai proses kompilasi mka..." >> ~/compile_output.log
-          # Menggunakan -j4 agar aman dari OOM/segfault di RAM 16GB GitHub Actions
           mka vendorbootimage -j4 >> ~/compile_output.log 2>&1 || mka recoveryimage -j4 >> ~/compile_output.log 2>&1
           
           echo "-> Memeriksa hasil file output build..." >> ~/compile_output.log
           OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
           
-          # Validasi apakah file img atau zip benar-benar tercipta
           if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] || ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
             echo "SUKSES: File image OrangeFox ditemukan!" >> ~/compile_output.log
             exit 0
@@ -98,23 +109,27 @@ jobs:
 
       - name: Generate Detailed Report File
         if: always()
+        env:
+          SYNC_OUTCOME: ${{ steps.sync.outcome }}
+          INJECT_OUTCOME: ${{ steps.inject.outcome }}
+          COMPILE_OUTCOME: ${{ steps.compile.outcome }}
         run: |
-          REPORT_FILE=~/report_${{ github.run_number }}.txt
+          REPORT_FILE=~/report_${GITHUB_RUN_NUMBER}.txt
           BUILD_TIME="$(date)"
           
-          cat << EOF > $REPORT_FILE
+          cat << 'EOF' > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD DETAILED REPORT
           ================================================================================
           Waktu Eksekusi : $BUILD_TIME
           Target Device  : Infinix X6855
-          Build Number   : #${{ github.run_number }}
+          Build Number   : #$GITHUB_RUN_NUMBER
           --------------------------------------------------------------------------------
           
           [ I. RINGKASAN STATUS TAHAPAN ]
-          - Sync Source         : ${{ steps.sync.outcome }}
-          - Inject Device Tree  : ${{ steps.inject.outcome }}
-          - Compile Recovery    : ${{ steps.compile.outcome }}
+          - Sync Source         : $SYNC_OUTCOME
+          - Inject Device Tree  : $INJECT_OUTCOME
+          - Compile Recovery    : $COMPILE_OUTCOME
           
           --------------------------------------------------------------------------------
           [ II. ANALISIS ERROR & DETAIL KESALAHAN ]
@@ -168,3 +183,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+          if-no-files-found: ignore
