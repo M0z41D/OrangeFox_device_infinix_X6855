@@ -39,33 +39,28 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize & Sync OrangeFox Manifest
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
           set -e
           
-          # 1. Bersihkan konfigurasi Git runner
+          # Bersihkan konfigurasi git bawaan runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
+          # Setel identitas Git
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          git config --global credential.helper ""
+          
+          # Rewrite seluruh URL GitLab agar otomatis terautentikasi menggunakan GITLAB_TOKEN
+          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
           
           mkdir -p ~/orangefox && cd ~/orangefox
-          mkdir -p .repo
           
-          # 2. Clone manifest secara manual ke .repo/manifests untuk bypass Cloudflare WAF
-          echo "Mengunduh manifest OrangeFox..."
-          if ! git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Manifest/manifest.git .repo/manifests 2>/dev/null; then
-            echo "Mirror GitHub gagal, mengunduh dari GitLab dengan HTTP header kustom..."
-            git clone --depth=1 -b fox_12.1 -c http.userAgent="git/2.43.0" https://gitlab.com/OrangeFox/Manifest.git .repo/manifests
-          fi
-          
-          # 3. Inisialisasi repo dari manifest lokal
-          repo init -u .repo/manifests -b fox_12.1 --depth=1
-          
-          # 4. Sync source code
+          # Inisialisasi dan sync source code
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
