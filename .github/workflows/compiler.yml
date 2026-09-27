@@ -64,9 +64,9 @@ jobs:
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Menginisialisasi repo OrangeFox dengan URL huruf kecil..."
-          # Menggunakan path 'manifest.git' huruf kecil
-          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/manifest.git -b fox_12.1 --depth=1
+          echo "==> Menginisialisasi repo OrangeFox menggunakan sync.git..."
+          # Menggunakan repository sync.git yang benar untuk OrangeFox
+          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b fox_12.1 --depth=1
           
           echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
