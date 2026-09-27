@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source via GitLab PAT
+      - name: Sync OrangeFox Source via Official Script
         env:
           GITLAB_TOKEN: "glpat-rG_iSpmZmzrufdPzMuzr7mM6MQpvOjEKdTpiZTh0cg8.01.170ikf6n1"
         run: |
@@ -58,18 +58,17 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Konfigurasi .netrc sebagai pendukung sinkronisasi sub-repo
+          # Konfigurasi .netrc sebagai pendukung autentikasi
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
-          mkdir -p ~/orangefox && cd ~/orangefox
+          echo "==> Mengkloning repository OrangeFox sync..."
+          mkdir -p ~/orangefox_sync && cd ~/orangefox_sync
+          git clone https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git .
           
-          echo "==> Menginisialisasi repo OrangeFox menggunakan branch master..."
-          # Menggunakan branch master yang valid sesuai hasil ls-remote
-          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b master --depth=1
-          
-          echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
+          echo "==> Menjalankan script orangefox_sync.sh..."
+          # Menggunakan branch 12.1 (Anda dapat mengubah ke 14.0 jika diperlukan)
+          ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
       - name: Inject Device Tree
         run: |
