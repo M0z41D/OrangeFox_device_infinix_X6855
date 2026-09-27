@@ -42,7 +42,10 @@ jobs:
         run: |
           set -e
           
-          # Bersihkan total konfigurasi git runner & hapus auth bawaan actions/checkout
+          # 1. Hapus total token bawaan GitHub Actions agar Git tidak memaksakan otentikasi
+          unset GITHUB_TOKEN GH_TOKEN
+          
+          # Bersihkan konfigurasi git runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git ~/.netrc
@@ -50,18 +53,17 @@ jobs:
           # Hapus variabel lingkungan git yang mengunci kredensial
           unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 || true
           
-          # Atur ulang konfigurasi global Git agar bersih dari kredensial macet
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          git config --global --unset-all credential.helper || true
           git config --global credential.helper ""
+          git config --global --unset-all http.https://github.com/.extraheader || true
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Mengkloning manifest OrangeFox dari Mirror GitHub..."
+          echo "==> Mengkloning manifest OrangeFox secara anonim dari Mirror GitHub..."
           mkdir -p .repo
           
-          # Kloning menggunakan URL yang menyertakan token kosong agar Git tidak memicu prompt username
+          # Kloning publik murni tanpa token
           git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Recovery/Manifest.git .repo/manifests || \
           git clone --depth=1 -b fox_12.1 https://github.com/OFRP/Manifest.git .repo/manifests || \
           git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Manifest/manifest.git .repo/manifests
