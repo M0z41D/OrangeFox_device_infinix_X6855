@@ -102,7 +102,12 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
           export LC_ALL="C"
+          
+          # Nonaktifkan set -e sementara saat envsetup agar pemeriksaan file opsional tidak menghentikan script
+          set +e
           source build/envsetup.sh
+          set -e
+          
           lunch fox_X6855-eng || lunch fox_X6855-userdebug || lunch twrp_X6855-eng
           mka recoveryimage -j$(nproc) || mka vendorbootimage -j$(nproc) || make recoveryimage -j$(nproc)
 
@@ -114,3 +119,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+            
