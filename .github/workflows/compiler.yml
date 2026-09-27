@@ -41,11 +41,11 @@ jobs:
       - name: Initialize & Sync OrangeFox Source via GitLab PAT
         env:
           # Ganti teks di bawah dengan Personal Access Token (PAT) GitLab Anda (berawalan glpat-)
-          GITLAB_TOKEN: "glpat-YOUR_GITLAB_TOKEN_HERE"
+          GITLAB_TOKEN: "glft-tmnLM7gFs8D3M8xJ-CAr"
         run: |
           set -e
           
-          if [ "$GITLAB_TOKEN" = "glpat-YOUR_GITLAB_TOKEN_HERE" ]; then
+          if [ "$GITLAB_TOKEN" = "glft-tmnLM7gFs8D3M8xJ-CAr" ]; then
             echo "ERROR: Silakan ganti 'glpat-YOUR_GITLAB_TOKEN_HERE' dengan token GitLab asli Anda di file compiler.yml!"
             exit 1
           fi
