@@ -1,22 +1,69 @@
-#
-# Copyright (C) 2026 The Android Open Source Project
-#
-# SPDX-License-Identifier: Apache-2.0
-#
+name: Build OrangeFox Recovery
 
-$(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
-$(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
+on:
+  workflow_dispatch:
 
-# Inherit OrangeFox common configuration
-$(call inherit-product, vendor/fox/config/common.mk)
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-# Inherit device configuration
-$(call inherit-product, device/infinix/X6855/device.mk)
+      - name: Maximize Build Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
-PRODUCT_DEVICE := X6855
-PRODUCT_NAME := fox_X6855
-PRODUCT_BRAND := Infinix
-PRODUCT_MODEL := Infinix Note 50 Pro
-PRODUCT_MANUFACTURER := Infinix
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32z1-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
 
-PRODUCT_GMS_CLIENTID_BASE := android-infinix
+      - name: Install Google Repo Tool
+        run: |
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo cp ~/bin/repo /usr/local/bin/repo
+
+      - name: Initialize OrangeFox Manifest
+        run: |
+          mkdir -p ~/orangefox && cd ~/orangefox
+          git config --global user.name "M0z41D"
+          git config --global user.email "m0z41d@example.com"
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
+
+      - name: Inject Device Tree
+        run: |
+          mkdir -p ~/orangefox/device/infinix/X6855
+          cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/
+
+      - name: Compile OrangeFox
+        run: |
+          cd ~/orangefox
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_BUILD_DEVICE="X6855"
+          export LC_ALL="C"
+          source build/envsetup.sh
+          lunch fox_X6855-eng || lunch fox_X6855-userdebug
+          mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrangeFox-Infinix-X6855
+          path: |
+            /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
+            /home/runner/orangefox/out/target/product/X6855/recovery.img
+            /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
