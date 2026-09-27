@@ -1,7 +1,5 @@
 #
 # Copyright (C) 2026 The Android Open Source Project
-# Copyright (C) 2026 SebaUbuntu's TWRP device tree generator
-#
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -12,6 +10,9 @@ TARGET_CPU_ABI2 :=
 TARGET_CPU_VARIANT := generic
 TARGET_CPU_SMP := true
 TARGET_ARCH_VARIANT := armv8-a
+
+# Fix 64-bit/32-bit build error
+TARGET_SUPPORTS_64_BIT_APPS := false
 
 # OrangeFox Theme & Screen Configuration 
 TW_THEME := portrait_hdpi
