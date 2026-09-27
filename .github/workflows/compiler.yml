@@ -46,15 +46,15 @@ jobs:
           echo "=== 2. TAHAP INJECT DEVICE TREE & PATCH CONFIG ===" > ~/inject_output.log
           mkdir -p ~/orangefox/device/infinix/X6855 >> ~/inject_output.log 2>&1
           cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/ >> ~/inject_output.log 2>&1
-          echo "Device tree berhasil disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
+          echo "Device tree berjaya disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
 
           BOARD_CONFIG=$(find ~/orangefox/device/infinix/X6855 -name "BoardConfig.mk" | head -n 1)
           if [ -n "$BOARD_CONFIG" ]; then
-            echo "BoardConfig.mk ditemukan di: $BOARD_CONFIG" >> ~/inject_output.log
+            echo "BoardConfig.mk ditemui di: $BOARD_CONFIG" >> ~/inject_output.log
             if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then
               echo "" >> "$BOARD_CONFIG"
               echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
-              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME ke BoardConfig.mk" >> ~/inject_output.log
+              echo "Berjaya menambah BOARD_KERNEL_IMAGE_NAME ke BoardConfig.mk" >> ~/inject_output.log
             fi
           fi
 
@@ -62,11 +62,11 @@ jobs:
           if [ -n "$VENDORSETUP" ]; then
             PRODUCT_MK_DIR=$(dirname "$VENDORSETUP")
             rm -f "$VENDORSETUP"
-            echo "vendorsetup.sh dihapus untuk mencegah error silent exit." >> ~/inject_output.log
+            echo "vendorsetup.sh dipadam untuk mengelakkan ralat konflik." >> ~/inject_output.log
             
             ANDROID_PRODUCTS="$PRODUCT_MK_DIR/AndroidProducts.mk"
             if [ ! -f "$ANDROID_PRODUCTS" ]; then
-              echo "Membuat AndroidProducts.mk baru..." >> ~/inject_output.log
+              echo "Membuat AndroidProducts.mk baharu..." >> ~/inject_output.log
               printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$ANDROID_PRODUCTS"
             fi
           fi
@@ -74,8 +74,9 @@ jobs:
       - name: Compile Recovery
         id: compile
         run: |
+          set +e
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
-          cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!" >> ~/compile_output.log; exit 1; }
+          cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemui!" >> ~/compile_output.log; exit 1; }
           
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
@@ -83,21 +84,24 @@ jobs:
           
           echo "-> Menjalankan envsetup.sh..." >> ~/compile_output.log
           source build/envsetup.sh >> ~/compile_output.log 2>&1
+          echo "Status exit envsetup: $?" >> ~/compile_output.log
 
           echo "-> Menjalankan perintah lunch..." >> ~/compile_output.log
           lunch fox_X6855-eng >> ~/compile_output.log 2>&1 || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1 || lunch omni_X6855-eng >> ~/compile_output.log 2>&1 || lunch omni_X6855-userdebug >> ~/compile_output.log 2>&1
+          echo "Status exit lunch: $?" >> ~/compile_output.log
 
-          echo "-> Memulai proses kompilasi mka..." >> ~/compile_output.log
+          echo "-> Memulakan proses kompilasi mka..." >> ~/compile_output.log
           mka vendorbootimage -j4 >> ~/compile_output.log 2>&1 || mka recoveryimage -j4 >> ~/compile_output.log 2>&1
+          echo "Status exit mka: $?" >> ~/compile_output.log
           
-          echo "-> Memeriksa hasil file output build..." >> ~/compile_output.log
+          echo "-> Memeriksa hasil fail output build..." >> ~/compile_output.log
           OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
           
           if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] || ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
-            echo "SUKSES: File image OrangeFox ditemukan!" >> ~/compile_output.log
+            echo "SUKSES: Fail image OrangeFox ditemui!" >> ~/compile_output.log
             exit 0
           else
-            echo "GAGAL TOTAL: File recovery.img / vendor_boot.img / .zip tidak ditemukan!" >> ~/compile_output.log
+            echo "GAGAL TOTAL: Fail recovery.img / vendor_boot.img / .zip tidak ditemui!" >> ~/compile_output.log
             exit 1
           fi
 
@@ -131,14 +135,39 @@ jobs:
           EOF
 
           if [ -f ~/compile_output.log ]; then
-            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci error standar." >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tiada kata kunci ralat standard ditemui." >> $REPORT_FILE
           fi
 
           cat << 'EOF' >> $REPORT_FILE
+
           --------------------------------------------------------------------------------
-          [ III. LOG EKSEKUSI LENGKAP ]
+          [ III. LOG EKSEKUSI LENGKAP DARI AWAL ]
+          
+          ========================================
+          1. LOG TAHAP SYNC
+          ========================================
           EOF
-          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kosong." >> $REPORT_FILE
+          cat ~/sync_output.log >> $REPORT_FILE 2>/dev/null || echo "Log sync kosong." >> $REPORT_FILE
+
+          cat << 'EOF' >> $REPORT_FILE
+
+          ========================================
+          2. LOG TAHAP INJECT DEVICE TREE
+          ========================================
+          EOF
+          cat ~/inject_output.log >> $REPORT_FILE 2>/dev/null || echo "Log inject kosong." >> $REPORT_FILE
+
+          cat << 'EOF' >> $REPORT_FILE
+
+          ========================================
+          3. LOG TAHAP KOMPILASI (BUILD)
+          ========================================
+          EOF
+          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kompilasi kosong." >> $REPORT_FILE
+
+          echo "" >> $REPORT_FILE
+          echo "================================================================================" >> $REPORT_FILE
+          echo "AKHIR DARI LAPORAN OTOMATIS" >> $REPORT_FILE
 
       - name: Upload Artifact
         if: always()
