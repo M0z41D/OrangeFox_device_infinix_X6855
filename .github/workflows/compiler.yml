@@ -39,33 +39,33 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize & Sync OrangeFox Manifest
-        env:
-          GIT_CONFIG_COUNT: "0"
-          GIT_CONFIG_PARAMETERS: ""
-          GIT_TERMINAL_PROMPT: "0"
         run: |
           set -e
           
-          # Hapus seluruh variabel lingkungan GIT_CONFIG yang disuntikkan runner
-          for var in $(env | grep -oP '^GIT_CONFIG_\w+'); do
-            unset "$var"
-          done
-          unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
-          
-          # Hapus file konfigurasi Git bawaan runner
+          # 1. Bersihkan konfigurasi Git runner
+          rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
-          # Setel identitas Git anonim
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           git config --global credential.helper ""
           
           mkdir -p ~/orangefox && cd ~/orangefox
+          mkdir -p .repo
           
-          # Inisialisasi manifest resmi OrangeFox dari GitLab
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+          # 2. Clone manifest secara manual ke .repo/manifests untuk bypass Cloudflare WAF
+          echo "Mengunduh manifest OrangeFox..."
+          if ! git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Manifest/manifest.git .repo/manifests 2>/dev/null; then
+            echo "Mirror GitHub gagal, mengunduh dari GitLab dengan HTTP header kustom..."
+            git clone --depth=1 -b fox_12.1 -c http.userAgent="git/2.43.0" https://gitlab.com/OrangeFox/Manifest.git .repo/manifests
+          fi
+          
+          # 3. Inisialisasi repo dari manifest lokal
+          repo init -u .repo/manifests -b fox_12.1 --depth=1
+          
+          # 4. Sync source code
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
@@ -91,4 +91,3 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
-            
