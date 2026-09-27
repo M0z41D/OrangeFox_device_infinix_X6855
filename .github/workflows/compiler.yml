@@ -38,42 +38,37 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source with Credential Bypass
+      - name: Initialize & Sync OrangeFox Source via GitLab PAT
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
           set -e
           
-          # Bersihkan konfigurasi git bawaan runner
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "ERROR: Secret GITLAB_TOKEN belum diatur di GitHub repository settings!"
+            exit 1
+          fi
+          
+          # Bersihkan konfigurasi git runner & token bawaan
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
-          rm -rf ~/.config/git ~/.netrc
-          unset GITHUB_TOKEN GH_TOKEN
+          rm -rf ~/.config/git
+          unset GITHUB_TOKEN GH_TOKEN GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS || true
           
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Konfigurasi credential helper agar otomatis merespons prompt kredensial Git
-          git config --global credential.helper '!f() { echo "username=oauth2"; echo "password=dummy"; }; f'
+          # Konfigurasi .netrc agar Git & Repo otomatis terautentikasi ke GitLab
+          echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
+          chmod 600 ~/.netrc
           
           mkdir -p ~/orangefox && cd ~/orangefox
-          mkdir -p .repo
           
-          echo "==> Mengkloning manifest OrangeFox dengan Credential Bypass..."
-          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/Manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://github.com/OrangeFoxRecovery/manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://github.com/OrangeFoxRecovery/Manifest.git .repo/manifests || \
-          {
-            echo "==> Menggunakan repo init langsung..."
-            repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          }
+          echo "==> Menginisialisasi repo OrangeFox..."
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           
-          # Pastikan folder manifests benar-benar terinisialisasi
-          if [ ! -d ".repo/manifests/.git" ]; then
-            repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          fi
-          
-          echo "==> Memulai Repo Sync..."
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j2 || \
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j1
+          echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
 
       - name: Inject Device Tree
         run: |
@@ -98,3 +93,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+            
