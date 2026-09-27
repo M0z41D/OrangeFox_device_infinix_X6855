@@ -40,22 +40,23 @@ jobs:
 
       - name: Initialize OrangeFox Manifest
         env:
-          GIT_CONFIG_PARAMETERS: ''
+          GIT_CONFIG_KEY_0: ""
+          GIT_CONFIG_VALUE_0: ""
+          GIT_CONFIG_PARAMETERS: ""
+          GIT_TERMINAL_PROMPT: "0"
         run: |
-          # Purge git environment and configs
-          unset GIT_CONFIG_PARAMETERS
+          # Purge injected environment variables
+          unset GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+          
+          # Remove runner persistent git configs
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
+          rm -rf ~/.config/git
           
-          # Git Identity
+          # Git Identity & Custom User-Agent
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          
-          # Force HTTPS for all repositories
-          git config --global url."https://github.com/".insteadOf "git://github.com/"
-          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
-          git config --global url."https://gitlab.com/".insteadOf "git://gitlab.com/"
-          git config --global url."https://gitlab.com/".insteadOf "ssh://git@gitlab.com/"
+          git config --global http.userAgent "Mozilla/5.0 (X11; Linux x86_64)"
           
           mkdir -p ~/orangefox && cd ~/orangefox
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
