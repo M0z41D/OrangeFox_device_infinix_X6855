@@ -1,24 +1,19 @@
       - name: Compile OrangeFox
         id: compile
         run: |
+          set +e
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
-          {
-            set +e
-            cd ~/orangefox
-            export ALLOW_MISSING_DEPENDENCIES=true
-            export FOX_BUILD_DEVICE="X6855"
-            export LC_ALL="C"
-            
-            echo "-> Menjalankan envsetup.sh..."
-            source build/envsetup.sh
-            echo "Status exit envsetup: $?"
-            
-            echo "-> Menjalankan perintah lunch..."
-            lunch fox_X6855-eng || lunch fox_X6855-userdebug
-            echo "Status exit lunch: $?"
-            
-            echo "-> Memulai proses kompilasi mka..."
-            mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
-            echo "Status exit mka: $?"
-            set -e
-          } >> ~/compile_output.log 2>&1
+          
+          cd ~/orangefox
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_BUILD_DEVICE="X6855"
+          export LC_ALL="C"
+          
+          echo "-> Menjalankan envsetup.sh..." >> ~/compile_output.log
+          source build/envsetup.sh >> ~/compile_output.log 2>&1
+          
+          echo "-> Menjalankan perintah lunch..." >> ~/compile_output.log
+          lunch fox_X6855-eng >> ~/compile_output.log 2>&1 || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1
+          
+          echo "-> Memulai proses kompilasi mka..." >> ~/compile_output.log
+          mka vendorbootimage -j$(nproc) >> ~/compile_output.log 2>&1 || mka recoveryimage -j$(nproc) >> ~/compile_output.log 2>&1
