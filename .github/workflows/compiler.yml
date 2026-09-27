@@ -3,6 +3,9 @@ name: Build OrangeFox Recovery
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -59,7 +62,7 @@ jobs:
           export LC_ALL="C"
           source build/envsetup.sh
           lunch fox_X6855-eng || lunch fox_X6855-userdebug
-          mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+          mka vendorbootimage -j$(nproc) \vert{}\vert{} mka recoveryimage -j$(nproc)
 
       - name: Generate Report File
         if: always()
@@ -73,19 +76,32 @@ jobs:
           echo "----------------------------------------" >> ~/report.txt
           
           if [ "${{ steps.compile.outcome }}" != "success" ]; then
-            echo "KESALAHAN TERDETEKSI PADA PROSES KOMPILASI!" >> ~/report.txt
-            echo "Silakan periksa detail error di log GitHub Actions." >> ~/report.txt
+            echo "STATUS: TERJADI KESALAHAN / BUILD GAGAL!" >> ~/report.txt
+            echo "Silakan periksa log di atas atau isi file report ini." >> ~/report.txt
           else
-            echo "BUILD BERHASIL SEPENUHNYA!" >> ~/report.txt
+            echo "STATUS: BUILD BERHASIL SEPENUHNYA!" >> ~/report.txt
           fi
 
-      - name: Upload Report & Artifacts
+      - name: Prepare Release Files
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          mkdir -p ~/release_files
+          cp /home/runner/report.txt ~/release_files/ || true
+          [ -f /home/runner/orangefox/out/target/product/X6855/vendor_boot.img ] && cp /home/runner/orangefox/out/target/product/X6855/vendor_boot.img ~/release_files/ || true
+          [ -f /home/runner/orangefox/out/target/product/X6855/recovery.img ] && cp /home/runner/orangefox/out/target/product/X6855/recovery.img ~/release_files/ || true
+          cp /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip ~/release_files/ 2>/dev/null || true
+
+      - name: Upload to GitHub Release
+        if: always()
+        uses: softprops/action-gh-release@v2
         with:
-          name: OrangeFox-Build-Report-and-Files
-          path: |
-            /home/runner/report.txt
-            /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
-            /home/runner/orangefox/out/target/product/X6855/recovery.img
-            /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+          tag_name: orangefox-build-${{ github.run_number }}
+          name: "OrangeFox Build Report & Files #${{ github.run_number }}"
+          body: |
+            Laporan otomatis untuk build Infinix X6855.
+            - Status Sync: ${{ steps.sync.outcome }}
+            - Status Inject: ${{ steps.inject.outcome }}
+            - Status Compile: ${{ steps.compile.outcome }}
+            
+            Silakan unduh file `report.txt` di bawah untuk melihat rincian status atau error-nya.
+          files: ~/release_files/*
