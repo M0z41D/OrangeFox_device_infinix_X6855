@@ -38,39 +38,38 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source via Direct Archive Mirror
+      - name: Initialize & Sync OrangeFox Source via GitLab with WAF Bypass
         run: |
           set -e
           
-          # Bersihkan konfigurasi git runner
+          # Bersihkan total konfigurasi git runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git ~/.netrc
+          unset GITHUB_TOKEN GH_TOKEN
           
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           git config --global credential.helper ""
           
+          # Set User-Agent browser agar lolos dari Cloudflare WAF GitLab
+          git config --global http.useragent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          
           mkdir -p ~/orangefox && cd ~/orangefox
+          mkdir -p .repo
           
-          echo "==> Mengunduh manifest OrangeFox via GitHub Archive..."
-          mkdir -p .repo/manifests
+          echo "==> Mengkloning manifest OrangeFox dari GitLab..."
+          git clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/Manifest.git .repo/manifests || \
+          {
+            echo "==> Fallback: Mengunduh arsip tarball GitLab dengan User-Agent browser..."
+            mkdir -p .repo/manifests
+            curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                 -sL "https://gitlab.com/OrangeFox/Manifest/-/archive/fox_12.1/Manifest-fox_12.1.tar.gz" -o manifest.tar.gz
+            tar -xzf manifest.tar.gz -C .repo/manifests --strip-components=1
+            rm -f manifest.tar.gz
+          }
           
-          # Unduh langsung file arsip manifest branch fox_12.1 dari mirror GitHub yang valid
-          curl -sL "https://github.com/OrangeFoxRecovery/Manifest/archive/refs/heads/fox_12.1.tar.gz" -o manifest.tar.gz || \
-          curl -sL "https://github.com/OrangeFox-Recovery/Manifest/archive/refs/heads/master.tar.gz" -o manifest.tar.gz
-          
-          tar -xzf manifest.tar.gz -C .repo/manifests --strip-components=1
-          rm -f manifest.tar.gz
-          
-          # Ubah folder manifests menjadi repository git lokal agar dapat dibaca oleh tool 'repo'
-          cd .repo/manifests
-          git init
-          git add .
-          git commit -m "Initialize local manifest backup"
-          cd ~/orangefox
-          
-          # Inisialisasi repo dari folder lokal
+          # Inisialisasi repo lokal
           repo init -u .repo/manifests -b fox_12.1 --depth=1
           
           echo "==> Memulai Repo Sync..."
@@ -100,4 +99,3 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
-            
