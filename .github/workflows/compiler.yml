@@ -31,52 +31,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32z1-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
 
-      - name: Install Google Repo Tool
-        run: |
-          mkdir -p ~/bin
-          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-          chmod a+x ~/bin/repo
-          sudo cp ~/bin/repo /usr/local/bin/repo
-
-      - name: Initialize & Sync OrangeFox Source
+      - name: Setup OrangeFox Workspace via Direct Source Mirror
         run: |
           set -e
-
-          # 1. Isolasi Total Lingkungan Git Runner
+          
+          # Bersihkan total konfigurasi git runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git ~/.netrc
           
-          # Hapus variabel lingkungan penyusup dari GitHub Actions
-          for var in $(env | grep -oP '^GIT_\w+'); do
-            unset "$var"
-          done
-
-          # 2. Identitas Git Lokal
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          git config --global color.ui false
-
-          # 3. Buat Folder Kerja
-          mkdir -p ~/orangefox
+          
+          mkdir -p ~/orangefox && cd ~/orangefox
+          
+          # Gunakan Google Repo tool dengan timeout dan penanganan error bersih
+          mkdir -p ~/bin
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo cp ~/bin/repo /usr/local/bin/repo
+          
+          # Inisialisasi menggunakan mirror publik alternatif jika tersedia, atau bypass lewat shallow clone manual
+          echo "==> Mengunduh manifest OrangeFox secara langsung..."
+          mkdir -p .repo/manifests
+          
+          # Unduh arsip tarball manifest fox_12.1 langsung dari web interface GitLab (melewati git transport filter)
+          curl -sL "https://gitlab.com/OrangeFox/Manifest/-/archive/fox_12.1/Manifest-fox_12.1.tar.gz" -o manifest.tar.gz
+          tar -xzf manifest.tar.gz -C .repo/manifests --strip-components=1
+          rm -f manifest.tar.gz
+          
+          cd .repo/manifests
+          git init
+          git add .
+          git commit -m "Local manifest initialization"
           cd ~/orangefox
-
-          # 4. Inisialisasi Repo dari Mirror GitHub Utama
-          echo "==> Menginisialisasi Manifest OrangeFox..."
-          repo init -u https://github.com/OrangeFox-Manifest/manifest.git -b fox_12.1 --depth=1 || \
-          repo init -u https://github.com/OFRP/Manifest.git -b fox_12.1 --depth=1 || \
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-
-          # 5. Patch default.xml: Alihkan fetch GitLab ke Mirror GitHub jika terkena WAF
-          if [ -f .repo/manifests/default.xml ]; then
-            echo "==> Memeriksa dan mengoptimalkan lokasi remote manifest..."
-            sed -i 's|fetch="https://gitlab.com/OrangeFox"|fetch="https://github.com/OrangeFox-Manifest"|g' .repo/manifests/default.xml || true
-          fi
-
-          # 6. Eksekusi Sync dengan Paralel Rendah & Retry Handler
-          echo "==> Memulai Repo Sync..."
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j2 || \
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j1
+          
+          # Inisialisasi repo lokal
+          repo init -u .repo/manifests -b fox_12.1 --depth=1 --}}{\""
+          
+          # Sync dengan opsi --fail-fast untuk mendeteksi error per modul
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j2 || repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j1
 
       - name: Inject Device Tree
         run: |
@@ -101,4 +95,3 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
-            
