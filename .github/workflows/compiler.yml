@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Maximize Build Space
         run: |
@@ -37,27 +39,33 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize & Sync OrangeFox Manifest
+        env:
+          GIT_CONFIG_COUNT: "0"
+          GIT_CONFIG_PARAMETERS: ""
+          GIT_TERMINAL_PROMPT: "0"
         run: |
           set -e
           
-          # Cleaning runner git configuration
-          rm -rf "$GITHUB_WORKSPACE/.git"
+          # Hapus seluruh variabel lingkungan GIT_CONFIG yang disuntikkan runner
+          for var in $(env | grep -oP '^GIT_CONFIG_\w+'); do
+            unset "$var"
+          done
+          unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
+          
+          # Hapus file konfigurasi Git bawaan runner
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
+          # Setel identitas Git anonim
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           git config --global credential.helper ""
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          # Initialize repo with fallback sources
-          if ! repo init -u https://github.com/OrangeFox-Recovery/Manifest.git -b fox_12.1 --depth=1; then
-            echo "GitHub mirror unavailable, falling back to GitLab..."
-            repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          fi
-          
+          # Inisialisasi manifest resmi OrangeFox dari GitLab
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
@@ -83,3 +91,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+            
