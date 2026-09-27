@@ -44,31 +44,50 @@ jobs:
         id: inject
         run: |
           echo "=== 2. TAHAP INJECT DEVICE TREE & PATCH CONFIG ===" > ~/inject_output.log
-          mkdir -p ~/orangefox/device/infinix/X6855 >> ~/inject_output.log 2>&1
-          cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/ >> ~/inject_output.log 2>&1
-          echo "Device tree berhasil disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
+          DT_DIR=~/orangefox/device/infinix/X6855
+          mkdir -p $DT_DIR >> ~/inject_output.log 2>&1
+          cp -r $GITHUB_WORKSPACE/* $DT_DIR/ >> ~/inject_output.log 2>&1
+          echo "Device tree berhasil disalin ke $DT_DIR" >> ~/inject_output.log
 
-          BOARD_CONFIG=$(find ~/orangefox/device/infinix/X6855 -name "BoardConfig.mk" | head -n 1)
+          # Patch BoardConfig.mk (Kernel image & TW_THEME)
+          BOARD_CONFIG=$(find $DT_DIR -name "BoardConfig.mk" | head -n 1)
           if [ -n "$BOARD_CONFIG" ]; then
             echo "BoardConfig.mk ditemukan di: $BOARD_CONFIG" >> ~/inject_output.log
             if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then
               echo "" >> "$BOARD_CONFIG"
               echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
-              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME ke BoardConfig.mk" >> ~/inject_output.log
+              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME" >> ~/inject_output.log
+            fi
+            if ! grep -q "TW_THEME" "$BOARD_CONFIG"; then
+              echo "" >> "$BOARD_CONFIG"
+              echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"
+              echo "Berhasil menambahkan TW_THEME := portrait_hdpi" >> ~/inject_output.log
             fi
           fi
 
-          VENDORSETUP=$(find ~/orangefox/device/infinix/X6855 -name "vendorsetup.sh" | head -n 1)
+          # Hapus vendorsetup.sh untuk mencegah silent exit
+          VENDORSETUP=$(find $DT_DIR -name "vendorsetup.sh" | head -n 1)
           if [ -n "$VENDORSETUP" ]; then
-            PRODUCT_MK_DIR=$(dirname "$VENDORSETUP")
             rm -f "$VENDORSETUP"
-            echo "vendorsetup.sh dihapus untuk mencegah error silent exit." >> ~/inject_output.log
-            
-            ANDROID_PRODUCTS="$PRODUCT_MK_DIR/AndroidProducts.mk"
-            if [ ! -f "$ANDROID_PRODUCTS" ]; then
-              echo "Membuat AndroidProducts.mk baru..." >> ~/inject_output.log
-              printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$ANDROID_PRODUCTS"
-            fi
+            echo "vendorsetup.sh dihapus." >> ~/inject_output.log
+          fi
+          
+          # Buat AndroidProducts.mk jika belum ada
+          ANDROID_PRODUCTS="$DT_DIR/AndroidProducts.mk"
+          if [ ! -f "$ANDROID_PRODUCTS" ]; then
+            echo "Membuat AndroidProducts.mk baru..." >> ~/inject_output.log
+            printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$ANDROID_PRODUCTS"
+          fi
+
+          # Salinkan atau buat product makefile jika belum ada
+          EXISTING_MK=$(find $DT_DIR -maxdepth 1 -name "*.mk" ! -name "BoardConfig.mk" ! -name "AndroidProducts.mk" | head -n 1)
+          if [ -n "$EXISTING_MK" ]; then
+            echo "Ditemukan file makefile: $EXISTING_MK" >> ~/inject_output.log
+            [ ! -f "$DT_DIR/fox_X6855.mk" ] && cp "$EXISTING_MK" "$DT_DIR/fox_X6855.mk"
+            [ ! -f "$DT_DIR/omni_X6855.mk" ] && cp "$EXISTING_MK" "$DT_DIR/omni_X6855.mk"
+          else
+            [ ! -f "$DT_DIR/fox_X6855.mk" ] && printf "PRODUCT_NAME := fox_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/fox_X6855.mk"
+            [ ! -f "$DT_DIR/omni_X6855.mk" ] && printf "PRODUCT_NAME := omni_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/omni_X6855.mk"
           fi
 
       - name: Compile Recovery
