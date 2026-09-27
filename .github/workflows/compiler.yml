@@ -3,9 +3,6 @@ name: Build OrangeFox Recovery
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -35,73 +32,102 @@ jobs:
 
       - name: Sync OrangeFox Source
         id: sync
-        continue-on-error: true
         run: |
+          echo "=== 1. TAHAP SYNC SOURCE ORANGEFOX ===" > ~/sync_output.log
           mkdir -p ~/orangefox_sync && cd ~/orangefox_sync
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          git clone https://gitlab.com/OrangeFox/sync.git .
-          ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
+          git clone https://gitlab.com/OrangeFox/sync.git . >> ~/sync_output.log 2>&1
+          ./orangefox_sync.sh --branch 12.1 --path ~/orangefox >> ~/sync_output.log 2>&1
 
       - name: Inject Device Tree
         id: inject
-        if: steps.sync.outcome == 'success'
-        continue-on-error: true
         run: |
-          mkdir -p ~/orangefox/device/infinix/X6855
-          cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/
+          echo "=== 2. TAHAP INJECT DEVICE TREE ===" > ~/inject_output.log
+          mkdir -p ~/orangefox/device/infinix/X6855 >> ~/inject_output.log 2>&1
+          cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/ >> ~/inject_output.log 2>&1
+          echo "Device tree berhasil disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
 
       - name: Compile OrangeFox
         id: compile
-        if: steps.inject.outcome == 'success'
-        continue-on-error: true
         run: |
+          echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
           cd ~/orangefox
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
           export LC_ALL="C"
-          source build/envsetup.sh
-          lunch fox_X6855-eng || lunch fox_X6855-userdebug
-          mka vendorbootimage -j$(nproc) \vert{}\vert{} mka recoveryimage -j$(nproc)
+          source build/envsetup.sh >> ~/compile_output.log 2>&1
+          lunch fox_X6855-eng || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1
+          mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc) >> ~/compile_output.log 2>&1
 
-      - name: Generate Report File
+      - name: Generate Detailed Report File
         if: always()
         run: |
-          echo "=== ORANGEFOX BUILD REPORT ===" > ~/report.txt
-          echo "Waktu Eksekusi: $(date)" >> ~/report.txt
-          echo "----------------------------------------" >> ~/report.txt
-          echo "1. Sync Status: ${{ steps.sync.outcome }}" >> ~/report.txt
-          echo "2. Inject Device Tree Status: ${{ steps.inject.outcome }}" >> ~/report.txt
-          echo "3. Compile Status: ${{ steps.compile.outcome }}" >> ~/report.txt
-          echo "----------------------------------------" >> ~/report.txt
+          REPORT_FILE=~/report_${{ github.run_number }}.txt
           
-          if [ "${{ steps.compile.outcome }}" != "success" ]; then
-            echo "STATUS: TERJADI KESALAHAN / BUILD GAGAL!" >> ~/report.txt
-            echo "Silakan periksa log di atas atau isi file report ini." >> ~/report.txt
+          cat << 'EOF' > $REPORT_FILE
+          ================================================================================
+                                  ORANGEFOX BUILD DETAILED REPORT
+          ================================================================================
+          Waktu Eksekusi : $(date)
+          Target Device  : Infinix X6855
+          Build Number   : #${{ github.run_number }}
+          --------------------------------------------------------------------------------
+          
+          [ I. RINGKASAN STATUS TAHAPAN ]
+          - Sync Source         : ${{ steps.sync.outcome }}
+          - Inject Device Tree  : ${{ steps.inject.outcome }}
+          - Compile Recovery    : ${{ steps.compile.outcome }}
+          
+          --------------------------------------------------------------------------------
+          [ II. ANALISIS ERROR & DETAIL KESALAHAN ]
+          EOF
+
+          if [ -f ~/compile_output.log ]; then
+            echo "Pemeriksaan pesan error pada proses kompilasi:" >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan baris error spesifik, silakan cek log lengkap di bawah." >> $REPORT_FILE
           else
-            echo "STATUS: BUILD BERHASIL SEPENUHNYA!" >> ~/report.txt
+            echo "Proses terhenti sebelum tahap kompilasi dimulai." >> $REPORT_FILE
           fi
 
-      - name: Prepare Release Files
-        if: always()
-        run: |
-          mkdir -p ~/release_files
-          cp /home/runner/report.txt ~/release_files/ || true
-          [ -f /home/runner/orangefox/out/target/product/X6855/vendor_boot.img ] && cp /home/runner/orangefox/out/target/product/X6855/vendor_boot.img ~/release_files/ || true
-          [ -f /home/runner/orangefox/out/target/product/X6855/recovery.img ] && cp /home/runner/orangefox/out/target/product/X6855/recovery.img ~/release_files/ || true
-          cp /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip ~/release_files/ 2>/dev/null || true
+          cat << 'EOF' >> $REPORT_FILE
 
-      - name: Upload to GitHub Release
+          --------------------------------------------------------------------------------
+          [ III. LOG EKSEKUSI LENGKAP DARI AWAL ]
+          
+          ========================================
+          1. LOG TAHAP SYNC
+          ========================================
+          EOF
+          cat ~/sync_output.log >> $REPORT_FILE 2>/dev/null || echo "Log sync kosong." >> $REPORT_FILE
+
+          cat << 'EOF' >> $REPORT_FILE
+
+          ========================================
+          2. LOG TAHAP INJECT DEVICE TREE
+          ========================================
+          EOF
+          cat ~/inject_output.log >> $REPORT_FILE 2>/dev/null || echo "Log inject kosong." >> $REPORT_FILE
+
+          cat << 'EOF' >> $REPORT_FILE
+
+          ========================================
+          3. LOG TAHAP KOMPILASI (BUILD)
+          ========================================
+          EOF
+          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kompilasi kosong." >> $REPORT_FILE
+
+          echo "" >> $REPORT_FILE
+          echo "================================================================================" >> $REPORT_FILE
+          echo "AKHIR DARI LAPORAN OTOMATIS" >> $REPORT_FILE
+
+      - name: Upload Artifact
         if: always()
-        uses: softprops/action-gh-release@v2
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: orangefox-build-${{ github.run_number }}
-          name: "OrangeFox Build Report & Files #${{ github.run_number }}"
-          body: |
-            Laporan otomatis untuk build Infinix X6855.
-            - Status Sync: ${{ steps.sync.outcome }}
-            - Status Inject: ${{ steps.inject.outcome }}
-            - Status Compile: ${{ steps.compile.outcome }}
-            
-            Silakan unduh file `report.txt` di bawah untuk melihat rincian status atau error-nya.
-          files: ~/release_files/*
+          name: OrangeFox-Report-${{ github.run_number }}
+          path: |
+            /home/runner/report_${{ github.run_number }}.txt
+            /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
+            /home/runner/orangefox/out/target/product/X6855/recovery.img
+            /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
