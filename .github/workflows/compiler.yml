@@ -40,25 +40,23 @@ jobs:
 
       - name: Initialize OrangeFox Manifest
         run: |
-          # 1. Hapus folder .git dari workspace dan file konfigurasi git runner
+          # 1. Hapus konfigurasi git bawaan runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
-          rm -f ~/.netrc
-
-          # 2. Hapus seluruh variabel lingkungan GIT_CONFIG yang disuntikkan runner
-          unset $(env | grep -oP '^GIT_CONFIG\w+') || true
-
-          # 3. Setel konfigurasi Git anonim yang bersih
-          git config --global user.name "M0z41D"
-          git config --global user.email "m0z41d@example.com"
-          git config --global credential.helper ""
-
-          # 4. Inisialisasi dan sync manifest dari GitLab
-          mkdir -p ~/orangefox && cd ~/orangefox
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+          
+          # 2. Jalankan repo init & sync di dalam subshell steril (env -i)
+          env -i HOME="$HOME" PATH="$PATH" USER="$USER" LC_ALL="C" bash -c '
+            git config --global user.name "M0z41D"
+            git config --global user.email "m0z41d@example.com"
+            git config --global credential.helper ""
+            git config --global http.userAgent "git/2.34.1"
+            
+            mkdir -p ~/orangefox && cd ~/orangefox
+            repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+            repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+          '
 
       - name: Inject Device Tree
         run: |
