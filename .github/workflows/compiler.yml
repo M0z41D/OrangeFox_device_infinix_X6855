@@ -40,43 +40,61 @@ jobs:
           git clone https://gitlab.com/OrangeFox/sync.git . >> ~/sync_output.log 2>&1
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox >> ~/sync_output.log 2>&1
 
-      - name: Inject Device Tree
+      - name: Inject Device Tree & Patch BoardConfig
         id: inject
         run: |
-          echo "=== 2. TAHAP INJECT DEVICE TREE ===" > ~/inject_output.log
+          echo "=== 2. TAHAP INJECT DEVICE TREE & PATCH CONFIG ===" > ~/inject_output.log
           mkdir -p ~/orangefox/device/infinix/X6855 >> ~/inject_output.log 2>&1
           cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/ >> ~/inject_output.log 2>&1
           echo "Device tree berhasil disalin ke ~/orangefox/device/infinix/X6855" >> ~/inject_output.log
 
+          # Otomatis cari BoardConfig.mk dan tambahkan BOARD_KERNEL_IMAGE_NAME jika belum ada
+          BOARD_CONFIG=$(find ~/orangefox/device/infinix/X6855 -name "BoardConfig.mk" | head -n 1)
+          if [ -n "$BOARD_CONFIG" ]; then
+            echo "BoardConfig.mk ditemukan di: $BOARD_CONFIG" >> ~/inject_output.log
+            if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then
+              echo "" >> "$BOARD_CONFIG"
+              echo "# Ditambahkan otomatis oleh workflow untuk fix error ckati" >> "$BOARD_CONFIG"
+              echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
+              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb ke $BOARD_CONFIG" >> ~/inject_output.log
+            else
+              echo "BOARD_KERNEL_IMAGE_NAME sudah ada di BoardConfig.mk" >> ~/inject_output.log
+            fi
+          else
+            echo "PERINGATAN: File BoardConfig.mk tidak ditemukan di direktori device tree!" >> ~/inject_output.log
+          fi
+
       - name: Compile OrangeFox
         id: compile
         run: |
-          set +e
-          set +o pipefail
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
-          echo "Cek direktori kerja awal:" >> ~/compile_output.log
-          pwd >> ~/compile_output.log
-          echo "Berpindah ke direktori ~/orangefox..." >> ~/compile_output.log
-          cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!" >> ~/compile_output.log; exit 0; }
-          echo "Cek isi direktori ~/orangefox:" >> ~/compile_output.log
-          ls -la build/envsetup.sh >> ~/compile_output.log 2>&1
+          cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!" >> ~/compile_output.log; exit 1; }
+          
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
           export LC_ALL="C"
+          
           echo "-> Menjalankan envsetup.sh..." >> ~/compile_output.log
-          if [ -f "build/envsetup.sh" ]; then
-            source build/envsetup.sh >> ~/compile_output.log 2>&1
-            echo "Status exit envsetup: $?" >> ~/compile_output.log
-          else
-            echo "ERROR: File build/envsetup.sh tidak ditemukan di direktori ini!" >> ~/compile_output.log
-            exit 0
-          fi
+          source build/envsetup.sh >> ~/compile_output.log 2>&1
+
           echo "-> Menjalankan perintah lunch..." >> ~/compile_output.log
           lunch fox_X6855-eng >> ~/compile_output.log 2>&1 || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1
-          echo "Status exit lunch: $?" >> ~/compile_output.log
+
           echo "-> Memulai proses kompilasi mka..." >> ~/compile_output.log
-          mka vendorbootimage -j$(nproc) >> ~/compile_output.log 2>&1 || mka recoveryimage -j$(nproc) >> ~/compile_output.log 2>&1
-          echo "Status exit mka: $?" >> ~/compile_output.log
+          # Menggunakan -j4 agar aman dari OOM/segfault di RAM 16GB GitHub Actions
+          mka vendorbootimage -j4 >> ~/compile_output.log 2>&1 || mka recoveryimage -j4 >> ~/compile_output.log 2>&1
+          
+          echo "-> Memeriksa hasil file output build..." >> ~/compile_output.log
+          OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
+          
+          # Validasi apakah file img atau zip benar-benar tercipta
+          if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] || ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
+            echo "SUKSES: File image OrangeFox ditemukan!" >> ~/compile_output.log
+            exit 0
+          else
+            echo "GAGAL TOTAL: Proses mka selesai tetapi file recovery.img / vendor_boot.img / .zip tidak ditemukan!" >> ~/compile_output.log
+            exit 1
+          fi
 
       - name: Generate Detailed Report File
         if: always()
