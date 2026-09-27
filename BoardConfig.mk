@@ -11,8 +11,9 @@ TARGET_CPU_ABI := arm64-v8a
 TARGET_CPU_ABI2 := 
 TARGET_CPU_VARIANT := generic
 TARGET_CPU_SMP := true
+TARGET_ARCH_VARIANT := armv8-a
 
-# OrangeFox Theme & Screen Configuration (Mengatasi error tema tidak disetel)
+# OrangeFox Theme & Screen Configuration 
 TW_THEME := portrait_hdpi
 TARGET_SCREEN_WIDTH := 720
 TARGET_SCREEN_HEIGHT := 1600
