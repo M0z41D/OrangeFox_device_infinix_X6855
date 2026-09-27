@@ -40,12 +40,13 @@ jobs:
 
       - name: Initialize & Sync OrangeFox Source via GitLab PAT
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          # Ganti teks di bawah dengan Personal Access Token (PAT) GitLab Anda (berawalan glpat-)
+          GITLAB_TOKEN: "glpat-YOUR_GITLAB_TOKEN_HERE"
         run: |
           set -e
           
-          if [ -z "$GITLAB_TOKEN" ]; then
-            echo "ERROR: Secret GITLAB_TOKEN belum diatur di GitHub repository settings!"
+          if [ "$GITLAB_TOKEN" = "glpat-YOUR_GITLAB_TOKEN_HERE" ]; then
+            echo "ERROR: Silakan ganti 'glpat-YOUR_GITLAB_TOKEN_HERE' dengan token GitLab asli Anda di file compiler.yml!"
             exit 1
           fi
           
@@ -93,4 +94,3 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
-            
