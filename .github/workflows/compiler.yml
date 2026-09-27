@@ -43,23 +43,27 @@ jobs:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
           set -e
+
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "ERROR: Secret GITLAB_TOKEN belum diatur di GitHub Settings!"
+            exit 1
+          fi
           
-          # Bersihkan konfigurasi git bawaan runner
+          # Clean git runner environment
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
-          # Setel identitas Git
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Rewrite seluruh URL GitLab agar otomatis terautentikasi menggunakan GITLAB_TOKEN
+          # Gunakan format header netrc atau URL rewrite yang kompatibel
           git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "git@gitlab.com:"
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          # Inisialisasi dan sync source code
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
@@ -86,3 +90,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+            
