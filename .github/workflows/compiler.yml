@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Maximize Build Space
         run: |
@@ -37,14 +39,48 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize OrangeFox Manifest
+        env:
+          GIT_CONFIG_PARAMETERS: ''
+          GIT_TERMINAL_PROMPT: '0'
         run: |
+          # 1. Bersihkan workspace dan konfigurasi git runner untuk menghentikan kebocoran token
+          rm -rf $GITHUB_WORKSPACE/.git
+          sudo rm -f /etc/gitconfig
+          rm -f ~/.gitconfig
+          rm -rf ~/.config/git
+          rm -f ~/.netrc
+
+          # 2. Setel konfigurasi Git anonim
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
+          git config --global url."https://github.com/".insteadOf "git://github.com/"
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://gitlab.com/".insteadOf "git://gitlab.com/"
+          git config --global url."https://gitlab.com/".insteadOf "ssh://git@gitlab.com/"
+
+          # 3. Buat folder manifest lokal dan unduh mentahan default.xml
+          mkdir -p ~/orangefox/.repo/manifests
           
-          mkdir -p ~/orangefox && cd ~/orangefox
-          # Menggunakan Mirror GitHub untuk menghindari pembatasan IP oleh GitLab
-          repo init -u https://github.com/OrangeFox-Recovery/Manifest.git -b fox_12.1 --depth=1 || repo init -u https://github.com/OFRP/Manifest.git -b fox_12.1 --depth=1
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
+          curl -sSL "https://gitlab.com/OrangeFox/Manifest/-/raw/fox_12.1/default.xml" -o ~/orangefox/.repo/manifests/default.xml || \
+          curl -sSL "https://gitlab.com/OrangeFox/Manifest/-/raw/master/default.xml" -o ~/orangefox/.repo/manifests/default.xml
+
+          # Verifikasi bahwa file default.xml valid
+          if ! grep -q "<manifest>" ~/orangefox/.repo/manifests/default.xml; then
+            echo "Error: Gagal mengunduh file manifest XML yang valid."
+            cat ~/orangefox/.repo/manifests/default.xml
+            exit 1
+          fi
+
+          # 4. Inisialisasi repository git lokal untuk manifest
+          cd ~/orangefox/.repo/manifests
+          git init
+          git add default.xml
+          git commit -m "Initialize local manifest"
+
+          # 5. Jalankan repo init dari folder lokal dan sync repository
+          cd ~/orangefox
+          repo init -u ~/orangefox/.repo/manifests
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
         run: |
