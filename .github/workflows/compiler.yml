@@ -77,7 +77,6 @@ jobs:
       - name: Fix Device Tree for Modern Build System
         run: |
           cd ~/orangefox/device/infinix/X6855
-          # Hapus vendorsetup.sh karena add_lunch_combo sudah usang dan memicu error fatal
           if [ -f vendorsetup.sh ]; then
             rm -f vendorsetup.sh
             echo "==> vendorsetup.sh berhasil dihapus."
@@ -98,13 +97,14 @@ jobs:
 
       - name: Compile OrangeFox
         run: |
+          set -ex
           cd ~/orangefox
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
           export LC_ALL="C"
           source build/envsetup.sh
-          lunch fox_X6855-eng || lunch fox_X6855-userdebug
-          mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+          lunch fox_X6855-eng || lunch fox_X6855-userdebug || lunch twrp_X6855-eng
+          mka recoveryimage -j$(nproc) || mka vendorbootimage -j$(nproc) || make recoveryimage -j$(nproc)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
