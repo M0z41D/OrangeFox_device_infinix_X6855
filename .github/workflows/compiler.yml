@@ -67,7 +67,6 @@ jobs:
           git clone https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git .
           
           echo "==> Menjalankan script orangefox_sync.sh..."
-          # Menggunakan branch 12.1 (Anda dapat mengubah ke 14.0 jika diperlukan)
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
       - name: Inject Device Tree
@@ -78,7 +77,13 @@ jobs:
       - name: Fix Device Tree for Modern Build System
         run: |
           cd ~/orangefox/device/infinix/X6855
-          echo "==> Membuat AndroidProducts.mk untuk mengatasi obsolete add_lunch_combo..."
+          # Hapus vendorsetup.sh karena add_lunch_combo sudah usang dan memicu error fatal
+          if [ -f vendorsetup.sh ]; then
+            rm -f vendorsetup.sh
+            echo "==> vendorsetup.sh berhasil dihapus."
+          fi
+          
+          echo "==> Membuat AndroidProducts.mk baru..."
           echo "PRODUCT_MAKEFILES := \\" > AndroidProducts.mk
           for mk in *.mk; do
             if [ "$mk" != "AndroidProducts.mk" ]; then
