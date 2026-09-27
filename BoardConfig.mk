@@ -12,6 +12,9 @@ TARGET_CPU_ABI := arm64-v8a
 TARGET_CPU_ABI2 := 
 TARGET_CPU_VARIANT := generic
 
+# Fix: 32-bit app on 64-bit device error
+TARGET_SUPPORTS_64_BIT_APPS := false
+
 # Assert
 TARGET_OTA_ASSERT_DEVICE := X6855,infinix_X6855
 
@@ -24,16 +27,14 @@ BOARD_HAS_LARGE_FILESYSTEM := true
 # Platform
 TARGET_BOARD_PLATFORM := mediatek
 
-# Recovery & Display Configuration
+# Recovery & Display Configuration (Fixes TW_THEME / ui.xml error)
 BOARD_USES_RECOVERY_AS_BOOT := true
-TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
-TARGET_SCREEN_DENSITY := 480
 TARGET_SCREEN_WIDTH := 1080
 TARGET_SCREEN_HEIGHT := 2400
+TARGET_SCREEN_DENSITY := 480
+TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
 
-# ==========================================
-# OrangeFox Brightness Settings (Fixes Error)
-# ==========================================
+# OrangeFox Brightness Settings
 TW_MAX_BRIGHTNESS := 255
 TW_DEFAULT_BRIGHTNESS := 100
 TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
