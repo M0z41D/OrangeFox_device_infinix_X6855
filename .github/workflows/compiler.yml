@@ -38,7 +38,7 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          repo sync -c --no-clone-bundle --no-tags -j$(nproc)
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
         run: |
@@ -48,9 +48,12 @@ jobs:
       - name: Compile OrangeFox
         run: |
           cd ~/orangefox
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_BUILD_DEVICE="X6855"
+          export LC_ALL="C"
           source build/envsetup.sh
           lunch fox_X6855-eng
-          mka vendor_bootimage -j$(nproc)
+          mka recoveryimage vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -58,4 +61,5 @@ jobs:
           name: OrangeFox-Infinix-X6855
           path: |
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
+            /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
