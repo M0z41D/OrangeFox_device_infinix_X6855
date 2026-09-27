@@ -39,27 +39,31 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize OrangeFox Manifest
-        env:
-          GIT_CONFIG_KEY_0: ""
-          GIT_CONFIG_VALUE_0: ""
-          GIT_CONFIG_PARAMETERS: ""
-          GIT_TERMINAL_PROMPT: "0"
         run: |
-          # Purge injected environment variables
-          unset GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
-          
-          # Remove runner persistent git configs
+          # Clean git configs
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
-          # Git Identity & Custom User-Agent
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          git config --global http.userAgent "Mozilla/5.0 (X11; Linux x86_64)"
           
-          mkdir -p ~/orangefox && cd ~/orangefox
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+          # Create target directories
+          mkdir -p ~/orangefox/.repo/manifests
+          cd ~/orangefox
+          
+          # Download manifest archive directly via HTTPS to bypass GitLab rate-limit
+          curl -sL https://gitlab.com/OrangeFox/Manifest/-/archive/fox_12.1/Manifest-fox_12.1.tar.gz | tar -xz -C ~/orangefox/.repo/manifests --strip-components=1
+          
+          # Initialize local manifest repository
+          cd ~/orangefox/.repo/manifests
+          git init
+          git add .
+          git commit -m "Initialize local manifest"
+          
+          # Run local repo init & sync
+          cd ~/orangefox
+          repo init -u ~/orangefox/.repo/manifests
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
 
       - name: Inject Device Tree
