@@ -62,15 +62,11 @@ jobs:
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
-          echo "==> Memeriksa branch yang tersedia di sync.git..."
-          git ls-remote --heads https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git
-          
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Menginisialisasi repo OrangeFox..."
-          # Coba gunakan branch utama yang umum (misal: 12.1 atau fox_12.1)
-          # Jika log di atas menunjukkan branch lain, kita bisa mengubahnya nanti.
-          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b 12.1 --depth=1
+          echo "==> Menginisialisasi repo OrangeFox menggunakan branch master..."
+          # Menggunakan branch master yang valid sesuai hasil ls-remote
+          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b master --depth=1
           
           echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
