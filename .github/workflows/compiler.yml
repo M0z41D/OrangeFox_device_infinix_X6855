@@ -12,17 +12,11 @@ jobs:
 
       - name: Maximize Build Space
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          sudo swapoff -a && sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile && sudo swapon /swapfile
 
       - name: Install Dependencies
         run: |
@@ -37,8 +31,9 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Sync OrangeFox Source
+        id: sync
+        continue-on-error: true
         run: |
-          set -e
           mkdir -p ~/orangefox_sync && cd ~/orangefox_sync
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
@@ -46,11 +41,17 @@ jobs:
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
       - name: Inject Device Tree
+        id: inject
+        if: steps.sync.outcome == 'success'
+        continue-on-error: true
         run: |
           mkdir -p ~/orangefox/device/infinix/X6855
           cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/
 
       - name: Compile OrangeFox
+        id: compile
+        if: steps.inject.outcome == 'success'
+        continue-on-error: true
         run: |
           cd ~/orangefox
           export ALLOW_MISSING_DEPENDENCIES=true
@@ -60,11 +61,31 @@ jobs:
           lunch fox_X6855-eng || lunch fox_X6855-userdebug
           mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
 
-      - name: Upload Artifact
+      - name: Generate Report File
+        if: always()
+        run: |
+          echo "=== ORANGEFOX BUILD REPORT ===" > ~/report.txt
+          echo "Waktu Eksekusi: $(date)" >> ~/report.txt
+          echo "----------------------------------------" >> ~/report.txt
+          echo "1. Sync Status: ${{ steps.sync.outcome }}" >> ~/report.txt
+          echo "2. Inject Device Tree Status: ${{ steps.inject.outcome }}" >> ~/report.txt
+          echo "3. Compile Status: ${{ steps.compile.outcome }}" >> ~/report.txt
+          echo "----------------------------------------" >> ~/report.txt
+          
+          if [ "${{ steps.compile.outcome }}" != "success" ]; then
+            echo "KESALAHAN TERDETEKSI PADA PROSES KOMPILASI!" >> ~/report.txt
+            echo "Silakan periksa detail error di log GitHub Actions." >> ~/report.txt
+          else
+            echo "BUILD BERHASIL SEPENUHNYA!" >> ~/report.txt
+          fi
+
+      - name: Upload Report & Artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: OrangeFox-Infinix-X6855
+          name: OrangeFox-Build-Report-and-Files
           path: |
+            /home/runner/report.txt
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
