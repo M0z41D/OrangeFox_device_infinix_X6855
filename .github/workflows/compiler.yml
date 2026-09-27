@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source via Script
+      - name: Initialize & Sync OrangeFox Source via Patched Script
         env:
           GITLAB_TOKEN: "glpat-rG_iSpmZmzrufdPzMuzr7mM6MQpvOjEKdTpiZTh0cg8.01.170ikf6n1"
         run: |
@@ -58,10 +58,7 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Paksa Git untuk otomatis menyisipkan token oauth2 ke setiap URL gitlab.com
-          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
-          
-          # Konfigurasi .netrc sebagai pendukung tambahan
+          # Konfigurasi .netrc sebagai pendukung autentikasi sub-repo
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
@@ -70,6 +67,10 @@ jobs:
           echo "==> Mengkloning repositori OrangeFox sync.git..."
           git clone https://gitlab.com/OrangeFox/sync.git
           cd sync
+          
+          echo "==> Mempatch skrip orangefox_sync.sh agar menyisipkan token ke URL manifest..."
+          sed -i "s|https://gitlab.com/OrangeFox/Manifest.git|https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/Manifest.git|g" orangefox_sync.sh
+          sed -i "s|https://gitlab.com/OrangeFox/manifest.git|https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/manifest.git|g" orangefox_sync.sh
           
           echo "==> Menjalankan orangefox_sync.sh dengan branch 16.0..."
           ./orangefox_sync.sh --branch 16.0 --path ~/orangefox
