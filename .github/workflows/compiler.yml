@@ -40,13 +40,14 @@ jobs:
 
       - name: Initialize OrangeFox Manifest
         run: |
-          git config --global --unset-all http.extraheader || true
-          git config --system --unset-all http.extraheader || true
-          git config --global credential.helper ""
+          # Purge runner default git configs to avoid token leaks to GitLab
+          sudo rm -f /etc/gitconfig
+          rm -f ~/.gitconfig
           
-          mkdir -p ~/orangefox && cd ~/orangefox
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
+          
+          mkdir -p ~/orangefox && cd ~/orangefox
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
 
