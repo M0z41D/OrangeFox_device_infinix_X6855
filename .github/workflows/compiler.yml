@@ -58,7 +58,10 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Konfigurasi .netrc sebagai pendukung sinkronisasi sub-repo
+          # Paksa Git untuk otomatis menyisipkan token oauth2 ke setiap URL gitlab.com
+          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+          
+          # Konfigurasi .netrc sebagai pendukung tambahan
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
