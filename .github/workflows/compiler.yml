@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Maximize Build Space
         run: |
@@ -38,8 +40,11 @@ jobs:
 
       - name: Initialize OrangeFox Manifest
         run: |
-          mkdir -p ~/orangefox && cd ~/orangefox
           git config --global --unset-all http.extraheader || true
+          git config --system --unset-all http.extraheader || true
+          git config --global credential.helper ""
+          
+          mkdir -p ~/orangefox && cd ~/orangefox
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
