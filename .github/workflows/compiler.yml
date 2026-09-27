@@ -14,17 +14,11 @@ jobs:
 
       - name: Maximize Build Space
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          sudo swapoff -a && sudo rm -f /swapfile
+          sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile && sudo swapon /swapfile
 
       - name: Install Dependencies
         run: |
@@ -38,18 +32,11 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Sync OrangeFox Source via Official Script
+      - name: Sync OrangeFox Source
         env:
           GITLAB_TOKEN: "glpat-rG_iSpmZmzrufdPzMuzr7mM6MQpvOjEKdTpiZTh0cg8.01.170ikf6n1"
         run: |
           set -e
-          
-          if [ -z "$GITLAB_TOKEN" ] || [ "$GITLAB_TOKEN" = "glpat-YOUR_GITLAB_TOKEN_HERE" ]; then
-            echo "ERROR: Token GitLab belum diatur dengan benar!"
-            exit 1
-          fi
-          
-          # Bersihkan konfigurasi git runner & token bawaan
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git
@@ -58,46 +45,17 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Konfigurasi .netrc sebagai pendukung autentikasi
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
-          echo "==> Mengkloning repository OrangeFox sync..."
           mkdir -p ~/orangefox_sync && cd ~/orangefox_sync
           git clone https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git .
-          
-          echo "==> Menjalankan script orangefox_sync.sh..."
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
       - name: Inject Device Tree
         run: |
           mkdir -p ~/orangefox/device/infinix/X6855
           cp -r $GITHUB_WORKSPACE/* ~/orangefox/device/infinix/X6855/
-
-      - name: Fix Device Tree for Modern Build System
-        run: |
-          cd ~/orangefox/device/infinix/X6855
-          if [ -f vendorsetup.sh ]; then
-            rm -f vendorsetup.sh
-            echo "==> vendorsetup.sh berhasil dihapus."
-          fi
-          
-          echo "==> Membuat AndroidProducts.mk yang bersih dan kompatibel..."
-          echo "PRODUCT_MAKEFILES := \\" > AndroidProducts.mk
-          for mk in *.mk; do
-            # Kecualikan BoardConfig.mk dan AndroidProducts.mk agar tidak memicu error parser produk
-            if [ "$mk" != "AndroidProducts.mk" ] && [ "$mk" != "BoardConfig.mk" ]; then
-              echo "    \$(LOCAL_DIR)/$mk \\" >> AndroidProducts.mk
-            fi
-          done
-          echo "" >> AndroidProducts.mk
-          echo "COMMON_LUNCH_CHOICES := \\" >> AndroidProducts.mk
-          echo "    fox_X6855-eng \\" >> AndroidProducts.mk
-          echo "    fox_X6855-userdebug \\" >> AndroidProducts.mk
-          echo "    omni_X6855-eng \\" >> AndroidProducts.mk
-          echo "    omni_X6855-userdebug \\" >> AndroidProducts.mk
-          echo "    twrp_X6855-eng \\" >> AndroidProducts.mk
-          echo "    twrp_X6855-userdebug" >> AndroidProducts.mk
 
       - name: Compile OrangeFox
         run: |
@@ -111,10 +69,8 @@ jobs:
           source build/envsetup.sh
           set -e
           
-          # Coba berbagai varian prefix lunch yang mungkin didefinisikan di device tree Anda
-          lunch fox_X6855-eng || lunch fox_X6855-userdebug || lunch omni_X6855-eng || lunch omni_X6855-userdebug || lunch twrp_X6855-eng || lunch twrp_X6855-userdebug
-          
-          mka recoveryimage -j$(nproc) || mka vendorbootimage -j$(nproc) || make recoveryimage -j$(nproc)
+          lunch fox_X6855-eng || lunch fox_X6855-userdebug || lunch omni_X6855-eng
+          mka recoveryimage -j$(nproc) || mka vendorbootimage -j$(nproc)
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
