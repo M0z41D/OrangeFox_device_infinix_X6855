@@ -9,8 +9,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - name: Maximize Build Space
         run: |
@@ -40,21 +38,12 @@ jobs:
 
       - name: Initialize OrangeFox Manifest
         run: |
-          # 1. Hapus folder .git dari workspace agar token GitHub Actions tidak bocor ke GitLab
-          rm -rf $GITHUB_WORKSPACE/.git
-          
-          # 2. Hapus file konfigurasi Git global dan sistem di runner
-          sudo rm -f /etc/gitconfig
-          rm -f ~/.gitconfig
-          rm -rf ~/.config/git
-          
-          # 3. Konfigurasi identitas Git baru
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # 4. Inisialisasi manifest dari GitLab secara anonim
           mkdir -p ~/orangefox && cd ~/orangefox
-          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
+          # Menggunakan Mirror GitHub untuk menghindari pembatasan IP oleh GitLab
+          repo init -u https://github.com/OrangeFox-Recovery/Manifest.git -b fox_12.1 --depth=1 || repo init -u https://github.com/OFRP/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
 
       - name: Inject Device Tree
