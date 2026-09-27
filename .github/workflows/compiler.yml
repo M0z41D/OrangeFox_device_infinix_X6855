@@ -40,7 +40,7 @@ jobs:
 
       - name: Initialize & Sync OrangeFox Source via GitLab PAT
         env:
-          GITLAB_TOKEN: "glft-tmnLM7gFs8D3M8xJ-CAr"
+          GITLAB_TOKEN: "glpat-rG_iSpmZmzrufdPzMuzr7mM6MQpvOjEKdTpiZTh0cg8.01.170ikf6n1"
         run: |
           set -e
           
