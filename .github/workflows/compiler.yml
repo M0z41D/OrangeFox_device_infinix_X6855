@@ -39,27 +39,22 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize OrangeFox Manifest
-        env:
-          GIT_CONFIG_COUNT: "0"
-          GIT_CONFIG_PARAMETERS: ""
-          GIT_TERMINAL_PROMPT: "0"
         run: |
-          # Purge runner global configs
+          # 1. Hapus folder .git dari workspace agar token GitHub Actions tidak bocor ke GitLab
+          rm -rf $GITHUB_WORKSPACE/.git
+          
+          # 2. Hapus file konfigurasi Git global dan sistem di runner
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
-          # Set Git identity
+          # 3. Konfigurasi identitas Git baru
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           
-          # Clone manifest directly via Git with isolated extraheaders
-          mkdir -p ~/orangefox/.repo/manifests
-          git -c http.extraheader="" clone --depth=1 -b fox_12.1 https://gitlab.com/OrangeFox/Manifest.git ~/orangefox/.repo/manifests
-          
-          # Initialize repo from local manifest directory
-          cd ~/orangefox
-          repo init -u ~/orangefox/.repo/manifests
+          # 4. Inisialisasi manifest dari GitLab secara anonim
+          mkdir -p ~/orangefox && cd ~/orangefox
+          repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
 
       - name: Inject Device Tree
