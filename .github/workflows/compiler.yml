@@ -38,9 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source via GitHub Mirror
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Initialize & Sync OrangeFox Source via Direct Archive Mirror
         run: |
           set -e
           
@@ -55,15 +53,24 @@ jobs:
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Mengkloning manifest OrangeFox menggunakan x-access-token..."
-          mkdir -p .repo
+          echo "==> Mengunduh manifest OrangeFox via GitHub Archive..."
+          mkdir -p .repo/manifests
           
-          # Kloning menggunakan format otentikasi x-access-token GitHub Actions
-          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OrangeFox-Recovery/Manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OFRP/Manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OrangeFox-Manifest/manifest.git .repo/manifests
+          # Unduh langsung file arsip manifest branch fox_12.1 dari mirror GitHub yang valid
+          curl -sL "https://github.com/OrangeFoxRecovery/Manifest/archive/refs/heads/fox_12.1.tar.gz" -o manifest.tar.gz || \
+          curl -sL "https://github.com/OrangeFox-Recovery/Manifest/archive/refs/heads/master.tar.gz" -o manifest.tar.gz
           
-          # Inisialisasi repo lokal berdasarkan manifest yang sudah dikloning
+          tar -xzf manifest.tar.gz -C .repo/manifests --strip-components=1
+          rm -f manifest.tar.gz
+          
+          # Ubah folder manifests menjadi repository git lokal agar dapat dibaca oleh tool 'repo'
+          cd .repo/manifests
+          git init
+          git add .
+          git commit -m "Initialize local manifest backup"
+          cd ~/orangefox
+          
+          # Inisialisasi repo dari folder lokal
           repo init -u .repo/manifests -b fox_12.1 --depth=1
           
           echo "==> Memulai Repo Sync..."
