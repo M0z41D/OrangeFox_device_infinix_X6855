@@ -38,7 +38,7 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Source via GitLab PAT
+      - name: Initialize & Sync OrangeFox Source via Script
         env:
           GITLAB_TOKEN: "glpat-rG_iSpmZmzrufdPzMuzr7mM6MQpvOjEKdTpiZTh0cg8.01.170ikf6n1"
         run: |
@@ -62,17 +62,14 @@ jobs:
           echo "machine gitlab.com login oauth2 password ${GITLAB_TOKEN}" > ~/.netrc
           chmod 600 ~/.netrc
           
-          # Cek daftar branch yang tersedia di sync.git untuk memastikan nama branch
-          echo "==> Mengecek daftar branch yang tersedia di OrangeFox/sync.git..."
-          git ls-remote --heads https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git
+          mkdir -p ~/OrangeFox_sync && cd ~/OrangeFox_sync
           
-          mkdir -p ~/orangefox && cd ~/orangefox
+          echo "==> Mengkloning repositori OrangeFox sync.git..."
+          git clone https://gitlab.com/OrangeFox/sync.git
+          cd sync
           
-          echo "==> Menginisialisasi repo OrangeFox menggunakan sync.git dengan branch 16.0..."
-          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b 16.0 --depth=1
-          
-          echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
+          echo "==> Menjalankan orangefox_sync.sh dengan branch 16.0..."
+          ./orangefox_sync.sh --branch 16.0 --path ~/orangefox
 
       - name: Inject Device Tree
         run: |
