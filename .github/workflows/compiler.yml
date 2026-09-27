@@ -39,34 +39,29 @@ jobs:
           sudo cp ~/bin/repo /usr/local/bin/repo
 
       - name: Initialize & Sync OrangeFox Source via GitHub Mirror
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          
-          # 1. Hapus total token bawaan GitHub Actions agar Git tidak memaksakan otentikasi
-          unset GITHUB_TOKEN GH_TOKEN
           
           # Bersihkan konfigurasi git runner
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git ~/.netrc
           
-          # Hapus variabel lingkungan git yang mengunci kredensial
-          unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 || true
-          
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           git config --global credential.helper ""
-          git config --global --unset-all http.https://github.com/.extraheader || true
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Mengkloning manifest OrangeFox secara anonim dari Mirror GitHub..."
+          echo "==> Mengkloning manifest OrangeFox menggunakan x-access-token..."
           mkdir -p .repo
           
-          # Kloning publik murni tanpa token
-          git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Recovery/Manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://github.com/OFRP/Manifest.git .repo/manifests || \
-          git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Manifest/manifest.git .repo/manifests
+          # Kloning menggunakan format otentikasi x-access-token GitHub Actions
+          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OrangeFox-Recovery/Manifest.git .repo/manifests || \
+          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OFRP/Manifest.git .repo/manifests || \
+          git clone --depth=1 -b fox_12.1 https://x-access-token:${GH_TOKEN}@github.com/OrangeFox-Manifest/manifest.git .repo/manifests
           
           # Inisialisasi repo lokal berdasarkan manifest yang sudah dikloning
           repo init -u .repo/manifests -b fox_12.1 --depth=1
@@ -98,3 +93,4 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
+            
