@@ -9,8 +9,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - name: Maximize Build Space
         run: |
@@ -38,25 +36,29 @@ jobs:
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize OrangeFox Manifest
+      - name: Initialize & Sync OrangeFox Manifest
         run: |
-          # 1. Hapus konfigurasi git bawaan runner
+          set -e
+          
+          # Cleaning runner git configuration
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig
           rm -f ~/.gitconfig
           rm -rf ~/.config/git
           
-          # 2. Jalankan repo init & sync di dalam subshell steril (env -i)
-          env -i HOME="$HOME" PATH="$PATH" USER="$USER" LC_ALL="C" bash -c '
-            git config --global user.name "M0z41D"
-            git config --global user.email "m0z41d@example.com"
-            git config --global credential.helper ""
-            git config --global http.userAgent "git/2.34.1"
-            
-            mkdir -p ~/orangefox && cd ~/orangefox
+          git config --global user.name "M0z41D"
+          git config --global user.email "m0z41d@example.com"
+          git config --global credential.helper ""
+          
+          mkdir -p ~/orangefox && cd ~/orangefox
+          
+          # Initialize repo with fallback sources
+          if ! repo init -u https://github.com/OrangeFox-Recovery/Manifest.git -b fox_12.1 --depth=1; then
+            echo "GitHub mirror unavailable, falling back to GitLab..."
             repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-            repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
-          '
+          fi
+          
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
 
       - name: Inject Device Tree
         run: |
