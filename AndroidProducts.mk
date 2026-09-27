@@ -3,6 +3,4 @@ PRODUCT_MAKEFILES := \
 
 COMMON_LUNCH_CHOICES := \
     fox_X6855-eng \
-    fox_X6855-userdebug \
-    omni_X6855-eng \
-    omni_X6855-userdebug
+    fox_X6855-userdebug
