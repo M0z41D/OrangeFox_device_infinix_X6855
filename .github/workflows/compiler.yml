@@ -50,26 +50,33 @@ jobs:
 
       - name: Compile OrangeFox
         id: compile
+        continue-on-error: true
         run: |
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
-          cd ~/orangefox
-          export ALLOW_MISSING_DEPENDENCIES=true
-          export FOX_BUILD_DEVICE="X6855"
-          export LC_ALL="C"
-          source build/envsetup.sh >> ~/compile_output.log 2>&1
-          lunch fox_X6855-eng || lunch fox_X6855-userdebug >> ~/compile_output.log 2>&1
-          mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc) >> ~/compile_output.log 2>&1
+          {
+            cd ~/orangefox
+            export ALLOW_MISSING_DEPENDENCIES=true
+            export FOX_BUILD_DEVICE="X6855"
+            export LC_ALL="C"
+            echo "-> Menjalankan envsetup.sh..."
+            source build/envsetup.sh
+            echo "-> Menjalankan perintah lunch..."
+            lunch fox_X6855-eng || lunch fox_X6855-userdebug
+            echo "-> Memulai proses kompilasi mka..."
+            mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc)
+          } >> ~/compile_output.log 2>&1
 
       - name: Generate Detailed Report File
         if: always()
         run: |
           REPORT_FILE=~/report_${{ github.run_number }}.txt
+          BUILD_TIME="$(date)"
           
-          cat << 'EOF' > $REPORT_FILE
+          cat << EOF > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD DETAILED REPORT
           ================================================================================
-          Waktu Eksekusi : $(date)
+          Waktu Eksekusi : $BUILD_TIME
           Target Device  : Infinix X6855
           Build Number   : #${{ github.run_number }}
           --------------------------------------------------------------------------------
@@ -85,9 +92,9 @@ jobs:
 
           if [ -f ~/compile_output.log ]; then
             echo "Pemeriksaan pesan error pada proses kompilasi:" >> $REPORT_FILE
-            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan baris error spesifik, silakan cek log lengkap di bawah." >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci error standar, silakan periksa rincian log di bawah." >> $REPORT_FILE
           else
-            echo "Proses terhenti sebelum tahap kompilasi dimulai." >> $REPORT_FILE
+            echo "Proses terhenti sebelum file log kompilasi sempat dibuat." >> $REPORT_FILE
           fi
 
           cat << 'EOF' >> $REPORT_FILE
