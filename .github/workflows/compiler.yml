@@ -42,16 +42,18 @@ jobs:
         run: |
           set -e
           
-          # Bersihkan total konfigurasi git runner
+          # Bersihkan total konfigurasi git runner & hapus auth bawaan actions/checkout
           rm -rf "$GITHUB_WORKSPACE/.git"
           sudo rm -f /etc/gitconfig ~/.gitconfig
           rm -rf ~/.config/git ~/.netrc
           
-          # Hapus variabel lingkungan git yang disuntikkan runner
+          # Hapus variabel lingkungan git yang mengunci kredensial
           unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 || true
           
+          # Atur ulang konfigurasi global Git agar bersih dari kredensial macet
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
+          git config --global --unset-all credential.helper || true
           git config --global credential.helper ""
           
           mkdir -p ~/orangefox && cd ~/orangefox
@@ -59,7 +61,7 @@ jobs:
           echo "==> Mengkloning manifest OrangeFox dari Mirror GitHub..."
           mkdir -p .repo
           
-          # Gunakan mirror publik GitHub resmi untuk manifest OrangeFox 12.1
+          # Kloning menggunakan URL yang menyertakan token kosong agar Git tidak memicu prompt username
           git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Recovery/Manifest.git .repo/manifests || \
           git clone --depth=1 -b fox_12.1 https://github.com/OFRP/Manifest.git .repo/manifests || \
           git clone --depth=1 -b fox_12.1 https://github.com/OrangeFox-Manifest/manifest.git .repo/manifests
@@ -94,4 +96,3 @@ jobs:
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
-            
