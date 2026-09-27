@@ -64,8 +64,8 @@ jobs:
           
           mkdir -p ~/orangefox && cd ~/orangefox
           
-          echo "==> Menginisialisasi repo OrangeFox menggunakan sync.git dengan branch 16.0..."
-          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b 16.0 --depth=1
+          echo "==> Menginisialisasi repo OrangeFox menggunakan sync.git dengan branch master..."
+          repo init -u https://oauth2:${GITLAB_TOKEN}@gitlab.com/OrangeFox/sync.git -b master --depth=1
           
           echo "==> Memulai Repo Sync (Mengunduh seluruh source code)..."
           repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j4
