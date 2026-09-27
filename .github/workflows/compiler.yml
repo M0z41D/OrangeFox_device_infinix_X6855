@@ -34,38 +34,49 @@ jobs:
       - name: Install Google Repo Tool
         run: |
           mkdir -p ~/bin
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod a+x ~/bin/repo
           sudo cp ~/bin/repo /usr/local/bin/repo
 
-      - name: Initialize & Sync OrangeFox Manifest
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      - name: Initialize & Sync OrangeFox Source
         run: |
           set -e
 
-          if [ -z "$GITLAB_TOKEN" ]; then
-            echo "ERROR: Secret GITLAB_TOKEN belum diatur di GitHub Settings!"
-            exit 1
-          fi
-          
-          # Clean git runner environment
+          # 1. Isolasi Total Lingkungan Git Runner
           rm -rf "$GITHUB_WORKSPACE/.git"
-          sudo rm -f /etc/gitconfig
-          rm -f ~/.gitconfig
-          rm -rf ~/.config/git
+          sudo rm -f /etc/gitconfig ~/.gitconfig
+          rm -rf ~/.config/git ~/.netrc
           
+          # Hapus variabel lingkungan penyusup dari GitHub Actions
+          for var in $(env | grep -oP '^GIT_\w+'); do
+            unset "$var"
+          done
+
+          # 2. Identitas Git Lokal
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
-          
-          # Gunakan format header netrc atau URL rewrite yang kompatibel
-          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
-          git config --global url."https://oauth2:${GITLAB_TOKEN}@gitlab.com/".insteadOf "git@gitlab.com:"
-          
-          mkdir -p ~/orangefox && cd ~/orangefox
-          
+          git config --global color.ui false
+
+          # 3. Buat Folder Kerja
+          mkdir -p ~/orangefox
+          cd ~/orangefox
+
+          # 4. Inisialisasi Repo dari Mirror GitHub Utama
+          echo "==> Menginisialisasi Manifest OrangeFox..."
+          repo init -u https://github.com/OrangeFox-Manifest/manifest.git -b fox_12.1 --depth=1 || \
+          repo init -u https://github.com/OFRP/Manifest.git -b fox_12.1 --depth=1 || \
           repo init -u https://gitlab.com/OrangeFox/Manifest.git -b fox_12.1 --depth=1
-          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j$(nproc)
+
+          # 5. Patch default.xml: Alihkan fetch GitLab ke Mirror GitHub jika terkena WAF
+          if [ -f .repo/manifests/default.xml ]; then
+            echo "==> Memeriksa dan mengoptimalkan lokasi remote manifest..."
+            sed -i 's|fetch="https://gitlab.com/OrangeFox"|fetch="https://github.com/OrangeFox-Manifest"|g' .repo/manifests/default.xml || true
+          fi
+
+          # 6. Eksekusi Sync dengan Paralel Rendah & Retry Handler
+          echo "==> Memulai Repo Sync..."
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j2 || \
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune -j1
 
       - name: Inject Device Tree
         run: |
