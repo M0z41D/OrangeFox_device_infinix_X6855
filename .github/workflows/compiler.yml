@@ -53,31 +53,25 @@ jobs:
             echo "BoardConfig.mk ditemukan di: $BOARD_CONFIG" >> ~/inject_output.log
             if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then
               echo "" >> "$BOARD_CONFIG"
-              echo "# Ditambahkan otomatis oleh workflow untuk fix error ckati" >> "$BOARD_CONFIG"
               echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
-              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb ke $BOARD_CONFIG" >> ~/inject_output.log
-            else
-              echo "BOARD_KERNEL_IMAGE_NAME sudah ada di BoardConfig.mk" >> ~/inject_output.log
+              echo "Berhasil menambahkan BOARD_KERNEL_IMAGE_NAME ke BoardConfig.mk" >> ~/inject_output.log
             fi
-          else
-            echo "PERINGATAN: File BoardConfig.mk tidak ditemukan!" >> ~/inject_output.log
           fi
 
           VENDORSETUP=$(find ~/orangefox/device/infinix/X6855 -name "vendorsetup.sh" | head -n 1)
           if [ -n "$VENDORSETUP" ]; then
-            echo "vendorsetup.sh ditemukan di: $VENDORSETUP" >> ~/inject_output.log
-            sed -i 's/add_lunch_combo/# add_lunch_combo/g' "$VENDORSETUP"
-            echo "Berhasil menonaktifkan add_lunch_combo yang obsolete di vendorsetup.sh" >> ~/inject_output.log
-            
             PRODUCT_MK_DIR=$(dirname "$VENDORSETUP")
+            rm -f "$VENDORSETUP"
+            echo "vendorsetup.sh dihapus untuk mencegah error silent exit." >> ~/inject_output.log
+            
             ANDROID_PRODUCTS="$PRODUCT_MK_DIR/AndroidProducts.mk"
             if [ ! -f "$ANDROID_PRODUCTS" ]; then
-              echo "Membuat AndroidProducts.mk otomatis..." >> ~/inject_output.log
+              echo "Membuat AndroidProducts.mk baru..." >> ~/inject_output.log
               printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$ANDROID_PRODUCTS"
             fi
           fi
 
-      - name: Compile OrangeFox
+      - name: Compile Recovery
         id: compile
         run: |
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
@@ -103,7 +97,7 @@ jobs:
             echo "SUKSES: File image OrangeFox ditemukan!" >> ~/compile_output.log
             exit 0
           else
-            echo "GAGAL TOTAL: Proses mka selesai tetapi file recovery.img / vendor_boot.img / .zip tidak ditemukan!" >> ~/compile_output.log
+            echo "GAGAL TOTAL: File recovery.img / vendor_boot.img / .zip tidak ditemukan!" >> ~/compile_output.log
             exit 1
           fi
 
@@ -113,17 +107,18 @@ jobs:
           SYNC_OUTCOME: ${{ steps.sync.outcome }}
           INJECT_OUTCOME: ${{ steps.inject.outcome }}
           COMPILE_OUTCOME: ${{ steps.compile.outcome }}
+          RUN_NUM: ${{ github.run_number }}
         run: |
-          REPORT_FILE=~/report_${GITHUB_RUN_NUMBER}.txt
+          REPORT_FILE=~/report_${RUN_NUM}.txt
           BUILD_TIME="$(date)"
           
-          cat << 'EOF' > $REPORT_FILE
+          cat << EOF > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD DETAILED REPORT
           ================================================================================
           Waktu Eksekusi : $BUILD_TIME
           Target Device  : Infinix X6855
-          Build Number   : #$GITHUB_RUN_NUMBER
+          Build Number   : #$RUN_NUM
           --------------------------------------------------------------------------------
           
           [ I. RINGKASAN STATUS TAHAPAN ]
@@ -136,42 +131,14 @@ jobs:
           EOF
 
           if [ -f ~/compile_output.log ]; then
-            echo "Pemeriksaan pesan error pada proses kompilasi:" >> $REPORT_FILE
-            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci error standar, silakan periksa rincian log di bawah." >> $REPORT_FILE
-          else
-            echo "Proses terhenti sebelum file log kompilasi sempat dibuat." >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci error standar." >> $REPORT_FILE
           fi
 
           cat << 'EOF' >> $REPORT_FILE
-
           --------------------------------------------------------------------------------
-          [ III. LOG EKSEKUSI LENGKAP DARI AWAL ]
-          
-          ========================================
-          1. LOG TAHAP SYNC
-          ========================================
+          [ III. LOG EKSEKUSI LENGKAP ]
           EOF
-          cat ~/sync_output.log >> $REPORT_FILE 2>/dev/null || echo "Log sync kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          2. LOG TAHAP INJECT DEVICE TREE
-          ========================================
-          EOF
-          cat ~/inject_output.log >> $REPORT_FILE 2>/dev/null || echo "Log inject kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          3. LOG TAHAP KOMPILASI (BUILD)
-          ========================================
-          EOF
-          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kompilasi kosong." >> $REPORT_FILE
-
-          echo "" >> $REPORT_FILE
-          echo "================================================================================" >> $REPORT_FILE
-          echo "AKHIR DARI LAPORAN OTOMATIS" >> $REPORT_FILE
+          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kosong." >> $REPORT_FILE
 
       - name: Upload Artifact
         if: always()
