@@ -53,12 +53,10 @@ jobs:
             git config --global user.email "m0z41d@example.com"
             git clone https://gitlab.com/OrangeFox/sync.git .
             
-            # Buat file stub patch agar skrip sync tidak error
             touch ~/orangefox_sync/patch-vendor-twrp-fox_12.1.diff 2>/dev/null || true
             
             ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
-            # Clone repositori vendor/fox yang benar
             if [ ! -d "$HOME/orangefox/vendor/fox" ]; then
               echo "Cloning vendor/fox repository..."
               git clone https://gitlab.com/OrangeFox/vendor/fox.git -b fox_12.1 ~/orangefox/vendor/fox --depth=1 || true
@@ -76,41 +74,40 @@ jobs:
             cp -r . "$DT_DIR/"
             echo "Device tree berhasil disalin ke $DT_DIR"
 
-            # Hapus variabel usang FOX_TARGET_DEVICES & OF_TARGET_DEVICES
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} +
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/OF_TARGET_DEVICES/d' {} +
-
-            # Ubah include vendor/fox menjadi safe-include (-include)
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i 's|^include vendor/fox/|-include vendor/fox/|g' {} +
 
-            # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib secara aman
             BOARD_CONFIG="$DT_DIR/BoardConfig.mk"
             if [ ! -f "$BOARD_CONFIG" ]; then
               touch "$BOARD_CONFIG"
             fi
             
-            if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"; fi
-            if ! grep -q "TW_THEME" "$BOARD_CONFIG"; then echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"; fi
-            if ! grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG"; then echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"; fi
-            if ! grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG"; then echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"; fi
-            if ! grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG"; then echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"; fi
+            grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG" || echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
+            grep -q "TW_THEME" "$BOARD_CONFIG" || echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"
+            grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG" || echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"
+            grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG" || echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"
+            grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG" || echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"
 
-            # Hapus vendorsetup.sh untuk mencegah konflik lunch
             rm -f "$DT_DIR/vendorsetup.sh"
 
-            # Buat AndroidProducts.mk jika belum ada
             if [ ! -f "$DT_DIR/AndroidProducts.mk" ]; then
-              printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$DT_DIR/AndroidProducts.mk"
+              echo 'PRODUCT_MAKEFILES := $(LOCAL_DIR)/fox_X6855.mk $(LOCAL_DIR)/omni_X6855.mk' > "$DT_DIR/AndroidProducts.mk"
+              echo 'COMMON_LUNCH_CHOICES := fox_X6855-eng fox_X6855-userdebug omni_X6855-eng omni_X6855-userdebug' >> "$DT_DIR/AndroidProducts.mk"
             fi
 
-            # Buat fox_X6855.mk jika belum ada
             if [ ! -f "$DT_DIR/fox_X6855.mk" ]; then
-              printf "\$(call inherit-product,\$(SRC_TARGET_DIR)/product/full_base_telephony.mk)\nPRODUCT_NAME := fox_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/fox_X6855.mk"
+              echo '$(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)' > "$DT_DIR/fox_X6855.mk"
+              echo 'PRODUCT_NAME := fox_X6855' >> "$DT_DIR/fox_X6855.mk"
+              echo 'PRODUCT_DEVICE := X6855' >> "$DT_DIR/fox_X6855.mk"
+              echo 'PRODUCT_MANUFACTURER := infinix' >> "$DT_DIR/fox_X6855.mk"
             fi
 
-            # Buat omni_X6855.mk jika belum ada
             if [ ! -f "$DT_DIR/omni_X6855.mk" ]; then
-              printf "\$(call inherit-product,\$(SRC_TARGET_DIR)/product/full_base_telephony.mk)\nPRODUCT_NAME := omni_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/omni_X6855.mk"
+              echo '$(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)' > "$DT_DIR/omni_X6855.mk"
+              echo 'PRODUCT_NAME := omni_X6855' >> "$DT_DIR/omni_X6855.mk"
+              echo 'PRODUCT_DEVICE := X6855' >> "$DT_DIR/omni_X6855.mk"
+              echo 'PRODUCT_MANUFACTURER := infinix' >> "$DT_DIR/omni_X6855.mk"
             fi
 
             echo "Struktur direktori device tree terinjeksi:"
@@ -126,13 +123,15 @@ jobs:
           {
             cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!"; exit 1; }
             
-            # Hapus pemicu error FOX_TARGET_DEVICES dari source tree recovery
             find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} + 2>/dev/null || true
 
-            # Patch extraneous endif di bootable/recovery/orangefox.mk baris 311 & 313
             OF_MK=~/orangefox/bootable/recovery/orangefox.mk
             if [ -f "$OF_MK" ]; then
-              sed -i '313d' "$OF_MK" 2>/dev/null \vert{}\vert{} sed -i '311s/^endif/# endif/' "$OF_MK" 2>/dev/null || true
+              echo 'import sys' > /tmp/patch_of.py
+              echo 'p = sys.argv[1]' >> /tmp/patch_of.py
+              echo 'lines = open(p).readlines()' >> /tmp/patch_of.py
+              echo 'open(p, "w").writelines([x for i, x in enumerate(lines) if not (i >= 309 and "endif" in x)])' >> /tmp/patch_of.py
+              python3 /tmp/patch_of.py "$OF_MK" 2>/dev/null || true
               echo "Patch extraneous endif pada $OF_MK telah diterapkan."
             fi
 
@@ -149,13 +148,13 @@ jobs:
             echo "Status exit lunch: $?"
 
             echo "-> Memulai proses kompilasi mka..."
-            mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc) \vert{}\vert{} mka bootimage -j$(nproc)
+            mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc) || mka bootimage -j$(nproc)
             echo "Status exit mka: $?"
             
             echo "-> Memeriksa hasil file output build..."
             OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
             
-            if [ -f "$OUT_DIR/recovery.img" ] \vert{}\vert{} [ -f "$OUT_DIR/vendor_boot.img" ] || [ -f "$OUT_DIR/boot.img" ] \vert{}\vert{} ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
+            if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] || [ -f "$OUT_DIR/boot.img" ] || ls $OUT_DIR/OrangeFox-*.zip >/dev/null 2>&1; then
               echo "SUKSES: File image OrangeFox ditemukan!"
               exit 0
             else
@@ -227,13 +226,13 @@ jobs:
             echo ""
             echo "--------------------------------------------------------------------------------"
             echo "[ III. RANGKUMAN TANGKAPAN ERROR & PERINGATAN ]"
-          } > $REPORT_FILE
+          } > "$REPORT_FILE"
 
           ERRORS_FOUND=$(grep -iE "error:|missing|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log ~/inject_output.log ~/sync_output.log ~/deps_output.log 2>/dev/null || true)
           if [ -n "$ERRORS_FOUND" ]; then
-            echo "$ERRORS_FOUND" >> $REPORT_FILE
+            echo "$ERRORS_FOUND" >> "$REPORT_FILE"
           else
-            echo "Tidak ditemukan pesan error spesifik dalam log." >> $REPORT_FILE
+            echo "Tidak ditemukan pesan error spesifik dalam log." >> "$REPORT_FILE"
           fi
 
           {
@@ -276,8 +275,9 @@ jobs:
             echo ""
             echo "================================================================================"
             echo "AKHIR DARI LAPORAN UTUH AUTOMATED REPORT"
-          } >> $REPORT_FILE
+          } >> "$REPORT_FILE"
 
+          BT=$(printf '\x60\x60\x60')
           {
             echo "# 🦊 OrangeFox Recovery Build Full Report (#$RUN_NUM)"
             echo ""
@@ -295,19 +295,19 @@ jobs:
             echo "---"
             echo ""
             echo "### 💾 Sumber Daya Sistem"
-            echo '```text'
+            echo "${BT}text"
             df -h | head -n 6
-            echo '```'
-            echo '```text'
+            echo "${BT}"
+            echo "${BT}text"
             free -h
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "---"
             echo ""
             echo "### 🚨 Analisis Error Terdeteksi"
-            echo '```text'
+            echo "${BT}text"
             grep -iE "error:|missing|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log ~/inject_output.log ~/sync_output.log ~/deps_output.log 2>/dev/null | tail -n 30 || echo "Tidak ada error spesifik terdeteksi."
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "---"
             echo ""
@@ -315,33 +315,33 @@ jobs:
             echo ""
             echo "<details><summary>🔍 1. Log Sync Source</summary>"
             echo ""
-            echo '```text'
+            echo "${BT}text"
             cat ~/sync_output.log 2>/dev/null || echo "Log sync kosong."
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "</details>"
             echo ""
             echo "<details><summary>🔍 2. Log Inject Device Tree</summary>"
             echo ""
-            echo '```text'
+            echo "${BT}text"
             cat ~/inject_output.log 2>/dev/null || echo "Log inject kosong."
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "</details>"
             echo ""
             echo "<details><summary>🔍 3. Log Compile Recovery</summary>"
             echo ""
-            echo '```text'
+            echo "${BT}text"
             cat ~/compile_output.log 2>/dev/null || echo "Log compile kosong."
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "</details>"
             echo ""
             echo "<details><summary>🔍 4. Log Install Dependencies & Setup</summary>"
             echo ""
-            echo '```text'
+            echo "${BT}text"
             cat ~/deps_output.log 2>/dev/null || echo "Log deps kosong."
-            echo '```'
+            echo "${BT}"
             echo ""
             echo "</details>"
           } > summary.md
