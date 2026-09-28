@@ -58,10 +58,10 @@ jobs:
             
             ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
 
-            # Clone repositori vendor/fox jika tidak otomatis diunduh
+            # Clone repositori vendor/fox yang benar
             if [ ! -d "$HOME/orangefox/vendor/fox" ]; then
               echo "Cloning vendor/fox repository..."
-              git clone https://gitlab.com/OrangeFox/vendor/recovery.git -b fox_12.1 ~/orangefox/vendor/fox || true
+              git clone https://gitlab.com/OrangeFox/vendor/fox.git -b fox_12.1 ~/orangefox/vendor/fox --depth=1 || true
             fi
           } >> ~/sync_output.log 2>&1
 
@@ -98,37 +98,19 @@ jobs:
             # Hapus vendorsetup.sh untuk mencegah konflik lunch
             rm -f "$DT_DIR/vendorsetup.sh"
 
-            # Buat AndroidProducts.mk
-            cat << 'EOF' > "$DT_DIR/AndroidProducts.mk"
-          PRODUCT_MAKEFILES := \
-              $(LOCAL_DIR)/fox_X6855.mk \
-              $(LOCAL_DIR)/omni_X6855.mk
-
-          COMMON_LUNCH_CHOICES := \
-              fox_X6855-eng \
-              fox_X6855-userdebug \
-              omni_X6855-eng \
-              omni_X6855-userdebug
-          EOF
+            # Buat AndroidProducts.mk jika belum ada
+            if [ ! -f "$DT_DIR/AndroidProducts.mk" ]; then
+              printf "PRODUCT_MAKEFILES := \\\n    \$(LOCAL_DIR)/fox_X6855.mk \\\n    \$(LOCAL_DIR)/omni_X6855.mk\n\nCOMMON_LUNCH_CHOICES := \\\n    fox_X6855-eng \\\n    fox_X6855-userdebug \\\n    omni_X6855-eng \\\n    omni_X6855-userdebug\n" > "$DT_DIR/AndroidProducts.mk"
+            fi
 
             # Buat fox_X6855.mk jika belum ada
             if [ ! -f "$DT_DIR/fox_X6855.mk" ]; then
-              cat << 'EOF' > "$DT_DIR/fox_X6855.mk"
-          $(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-          PRODUCT_NAME := fox_X6855
-          PRODUCT_DEVICE := X6855
-          PRODUCT_MANUFACTURER := infinix
-          EOF
+              printf "\$(call inherit-product,\$(SRC_TARGET_DIR)/product/full_base_telephony.mk)\nPRODUCT_NAME := fox_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/fox_X6855.mk"
             fi
 
             # Buat omni_X6855.mk jika belum ada
             if [ ! -f "$DT_DIR/omni_X6855.mk" ]; then
-              cat << 'EOF' > "$DT_DIR/omni_X6855.mk"
-          $(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)
-          PRODUCT_NAME := omni_X6855
-          PRODUCT_DEVICE := X6855
-          PRODUCT_MANUFACTURER := infinix
-          EOF
+              printf "\$(call inherit-product,\$(SRC_TARGET_DIR)/product/full_base_telephony.mk)\nPRODUCT_NAME := omni_X6855\nPRODUCT_DEVICE := X6855\nPRODUCT_MANUFACTURER := infinix\n" > "$DT_DIR/omni_X6855.mk"
             fi
 
             echo "Struktur direktori device tree terinjeksi:"
@@ -147,10 +129,10 @@ jobs:
             # Hapus pemicu error FOX_TARGET_DEVICES dari source tree recovery
             find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} + 2>/dev/null || true
 
-            # Patch extraneous endif di bootable/recovery/orangefox.mk baris 311
+            # Patch extraneous endif di bootable/recovery/orangefox.mk baris 311 & 313
             OF_MK=~/orangefox/bootable/recovery/orangefox.mk
             if [ -f "$OF_MK" ]; then
-              sed -i '311s/^endif/# endif/' "$OF_MK" 2>/dev/null || true
+              sed -i '313d' "$OF_MK" 2>/dev/null \vert{}\vert{} sed -i '311s/^endif/# endif/' "$OF_MK" 2>/dev/null || true
               echo "Patch extraneous endif pada $OF_MK telah diterapkan."
             fi
 
@@ -167,13 +149,13 @@ jobs:
             echo "Status exit lunch: $?"
 
             echo "-> Memulai proses kompilasi mka..."
-            mka vendorbootimage -j4 || mka recoveryimage -j4
+            mka vendorbootimage -j$(nproc) || mka recoveryimage -j$(nproc) \vert{}\vert{} mka bootimage -j$(nproc)
             echo "Status exit mka: $?"
             
             echo "-> Memeriksa hasil file output build..."
             OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
             
-            if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] \vert{}\vert{} ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
+            if [ -f "$OUT_DIR/recovery.img" ] \vert{}\vert{} [ -f "$OUT_DIR/vendor_boot.img" ] || [ -f "$OUT_DIR/boot.img" ] \vert{}\vert{} ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
               echo "SUKSES: File image OrangeFox ditemukan!"
               exit 0
             else
@@ -215,37 +197,37 @@ jobs:
           ICON_INJECT=$(get_icon "$INJECT_OUTCOME")
           ICON_COMPILE=$(get_icon "$COMPILE_OUTCOME")
 
-          cat << EOF > $REPORT_FILE
-          ================================================================================
-                                  ORANGEFOX BUILD FULL DETAILED REPORT
-          ================================================================================
-          Waktu Eksekusi : $BUILD_TIME
-          Target Device  : Infinix X6855
-          Build Number   : #$RUN_NUM
-          Runner OS      : $(lsb_release -ds 2>/dev/null || echo "Ubuntu")
-          CPU Cores      : $(nproc) Cores
-          --------------------------------------------------------------------------------
-          
-          [ I. RINGKASAN STATUS TAHAPAN WORKFLOW ]
-          - Checkout Code       : $ICON_CHECKOUT
-          - Maximize Build Space: $ICON_SPACE
-          - Install Dependencies: $ICON_DEPS
-          - Install Repo Tool   : $ICON_REPO
-          - Sync Source         : $ICON_SYNC
-          - Inject Device Tree  : $ICON_INJECT
-          - Compile Recovery    : $ICON_COMPILE
-          
-          --------------------------------------------------------------------------------
-          [ II. INFORMASI SUMBER DAYA SISTEM (DISK & RAM) ]
-          --- Kapasitas Disk (DF) ---
-          $(df -h)
-
-          --- Status Memori & Swap (FREE) ---
-          $(free -h)
-
-          --------------------------------------------------------------------------------
-          [ III. RANGKUMAN TANGKAPAN ERROR & PERINGATAN ]
-          EOF
+          {
+            echo "================================================================================"
+            echo "                        ORANGEFOX BUILD FULL DETAILED REPORT"
+            echo "================================================================================"
+            echo "Waktu Eksekusi : $BUILD_TIME"
+            echo "Target Device  : Infinix X6855"
+            echo "Build Number   : #$RUN_NUM"
+            echo "Runner OS      : $(lsb_release -ds 2>/dev/null || echo "Ubuntu")"
+            echo "CPU Cores      : $(nproc) Cores"
+            echo "--------------------------------------------------------------------------------"
+            echo ""
+            echo "[ I. RINGKASAN STATUS TAHAPAN WORKFLOW ]"
+            echo "- Checkout Code       : $ICON_CHECKOUT"
+            echo "- Maximize Build Space: $ICON_SPACE"
+            echo "- Install Dependencies: $ICON_DEPS"
+            echo "- Install Repo Tool   : $ICON_REPO"
+            echo "- Sync Source         : $ICON_SYNC"
+            echo "- Inject Device Tree  : $ICON_INJECT"
+            echo "- Compile Recovery    : $ICON_COMPILE"
+            echo ""
+            echo "--------------------------------------------------------------------------------"
+            echo "[ II. INFORMASI SUMBER DAYA SISTEM (DISK & RAM) ]"
+            echo "--- Kapasitas Disk (DF) ---"
+            df -h
+            echo ""
+            echo "--- Status Memori & Swap (FREE) ---"
+            free -h
+            echo ""
+            echo "--------------------------------------------------------------------------------"
+            echo "[ III. RANGKUMAN TANGKAPAN ERROR & PERINGATAN ]"
+          } > $REPORT_FILE
 
           ERRORS_FOUND=$(grep -iE "error:|missing|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log ~/inject_output.log ~/sync_output.log ~/deps_output.log 2>/dev/null || true)
           if [ -n "$ERRORS_FOUND" ]; then
@@ -254,130 +236,115 @@ jobs:
             echo "Tidak ditemukan pesan error spesifik dalam log." >> $REPORT_FILE
           fi
 
-          cat << 'EOF' >> $REPORT_FILE
+          {
+            echo ""
+            echo "========================================"
+            echo "1. LOG MAXIMIZE SPACE"
+            echo "========================================"
+            cat ~/space_output.log 2>/dev/null || echo "Log space kosong."
+            
+            echo ""
+            echo "========================================"
+            echo "2. LOG INSTALL DEPENDENCIES"
+            echo "========================================"
+            cat ~/deps_output.log 2>/dev/null || echo "Log deps kosong."
+            
+            echo ""
+            echo "========================================"
+            echo "3. LOG INSTALL REPO TOOL"
+            echo "========================================"
+            cat ~/repo_output.log 2>/dev/null || echo "Log repo tool kosong."
+            
+            echo ""
+            echo "========================================"
+            echo "4. LOG SYNC SOURCE"
+            echo "========================================"
+            cat ~/sync_output.log 2>/dev/null || echo "Log sync kosong."
+            
+            echo ""
+            echo "========================================"
+            echo "5. LOG INJECT DEVICE TREE"
+            echo "========================================"
+            cat ~/inject_output.log 2>/dev/null || echo "Log inject kosong."
+            
+            echo ""
+            echo "========================================"
+            echo "6. LOG KOMPILASI (COMPILE BUILD)"
+            echo "========================================"
+            cat ~/compile_output.log 2>/dev/null || echo "Log compile kosong."
+            
+            echo ""
+            echo "================================================================================"
+            echo "AKHIR DARI LAPORAN UTUH AUTOMATED REPORT"
+          } >> $REPORT_FILE
 
-          ========================================
-          1. LOG MAXIMIZE SPACE
-          ========================================
-          EOF
-          cat ~/space_output.log >> $REPORT_FILE 2>/dev/null || echo "Log space kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          2. LOG INSTALL DEPENDENCIES
-          ========================================
-          EOF
-          cat ~/deps_output.log >> $REPORT_FILE 2>/dev/null || echo "Log deps kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          3. LOG INSTALL REPO TOOL
-          ========================================
-          EOF
-          cat ~/repo_output.log >> $REPORT_FILE 2>/dev/null || echo "Log repo tool kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          4. LOG SYNC SOURCE
-          ========================================
-          EOF
-          cat ~/sync_output.log >> $REPORT_FILE 2>/dev/null || echo "Log sync kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          5. LOG INJECT DEVICE TREE
-          ========================================
-          EOF
-          cat ~/inject_output.log >> $REPORT_FILE 2>/dev/null || echo "Log inject kosong." >> $REPORT_FILE
-
-          cat << 'EOF' >> $REPORT_FILE
-
-          ========================================
-          6. LOG KOMPILASI (COMPILE BUILD)
-          ========================================
-          EOF
-          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log compile kosong." >> $REPORT_FILE
-
-          echo "" >> $REPORT_FILE
-          echo "================================================================================" >> $REPORT_FILE
-          echo "AKHIR DARI LAPORAN UTUH AUTOMATED REPORT" >> $REPORT_FILE
-
-          cat << EOF > summary.md
-          # 🦊 OrangeFox Recovery Build Full Report (#$RUN_NUM)
-
-          ### 📊 Ringkasan Status Tahapan
-          | Tahapan Build | Status | Detail |
-          | :--- | :---: | :--- |
-          | 🛠️ Checkout Code | $ICON_CHECKOUT | Ambil kode repositori |
-          | 🧹 Maximize Build Space | $ICON_SPACE | Bersihkan disk runner & swap |
-          | 📦 Install Dependencies | $ICON_DEPS | Pasang paket kompilasi |
-          | 🛠️ Install Repo Tool | $ICON_REPO | Unduh Google Repo CLI |
-          | 🔄 Sync Source | $ICON_SYNC | Pull manifes OrangeFox 12.1 |
-          | 📁 Inject Device Tree | $ICON_INJECT | Konfigurasi Infinix X6855 |
-          | ⚙️ Compile Recovery | $ICON_COMPILE | Kompilasi image recovery |
-
-          ---
-
-          ### 💾 Sumber Daya Sistem
-          \`\`\`text
-          $(df -h | head -n 6)
-          \`\`\`
-          \`\`\`text
-          $(free -h)
-          \`\`\`
-
-          ---
-
-          ### 🚨 Analisis Error Terdeteksi
-          \`\`\`text
-          $(grep -iE "error:|missing|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log ~/inject_output.log ~/sync_output.log ~/deps_output.log 2>/dev/null | tail -n 30 || echo "Tidak ada error spesifik terdeteksi.")
-          \`\`\`
-
-          ---
-
-          ### 📜 Log Eksekusi Lengkap (Klik Dropdown)
-
-          <details>
-          <summary>🔍 1. Log Sync Source</summary>
-
-          \`\`\`text
-          $(cat ~/sync_output.log 2>/dev/null || echo "Log sync kosong.")
-          \`\`\`
-
-          </details>
-
-          <details>
-          <summary>🔍 2. Log Inject Device Tree</summary>
-
-          \`\`\`text
-          $(cat ~/inject_output.log 2>/dev/null || echo "Log inject kosong.")
-          \`\`\`
-
-          </details>
-
-          <details>
-          <summary>🔍 3. Log Compile Recovery</summary>
-
-          \`\`\`text
-          $(cat ~/compile_output.log 2>/dev/null || echo "Log compile kosong.")
-          \`\`\`
-
-          </details>
-
-          <details>
-          <summary>🔍 4. Log Install Dependencies & Setup</summary>
-
-          \`\`\`text
-          $(cat ~/deps_output.log 2>/dev/null || echo "Log deps kosong.")
-          \`\`\`
-
-          </details>
-
-          EOF
+          {
+            echo "# 🦊 OrangeFox Recovery Build Full Report (#$RUN_NUM)"
+            echo ""
+            echo "### 📊 Ringkasan Status Tahapan"
+            echo "| Tahapan Build | Status | Detail |"
+            echo "| :--- | :---: | :--- |"
+            echo "| 🛠️ Checkout Code | $ICON_CHECKOUT | Ambil kode repositori |"
+            echo "| 🧹 Maximize Build Space | $ICON_SPACE | Bersihkan disk runner & swap |"
+            echo "| 📦 Install Dependencies | $ICON_DEPS | Pasang paket kompilasi |"
+            echo "| 🛠️ Install Repo Tool | $ICON_REPO | Unduh Google Repo CLI |"
+            echo "| 🔄 Sync Source | $ICON_SYNC | Pull manifes OrangeFox 12.1 |"
+            echo "| 📁 Inject Device Tree | $ICON_INJECT | Konfigurasi Infinix X6855 |"
+            echo "| ⚙️ Compile Recovery | $ICON_COMPILE | Kompilasi image recovery |"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 💾 Sumber Daya Sistem"
+            echo '```text'
+            df -h | head -n 6
+            echo '```'
+            echo '```text'
+            free -h
+            echo '```'
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 🚨 Analisis Error Terdeteksi"
+            echo '```text'
+            grep -iE "error:|missing|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log ~/inject_output.log ~/sync_output.log ~/deps_output.log 2>/dev/null | tail -n 30 || echo "Tidak ada error spesifik terdeteksi."
+            echo '```'
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📜 Log Eksekusi Lengkap (Klik Dropdown)"
+            echo ""
+            echo "<details><summary>🔍 1. Log Sync Source</summary>"
+            echo ""
+            echo '```text'
+            cat ~/sync_output.log 2>/dev/null || echo "Log sync kosong."
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "<details><summary>🔍 2. Log Inject Device Tree</summary>"
+            echo ""
+            echo '```text'
+            cat ~/inject_output.log 2>/dev/null || echo "Log inject kosong."
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "<details><summary>🔍 3. Log Compile Recovery</summary>"
+            echo ""
+            echo '```text'
+            cat ~/compile_output.log 2>/dev/null || echo "Log compile kosong."
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "<details><summary>🔍 4. Log Install Dependencies & Setup</summary>"
+            echo ""
+            echo '```text'
+            cat ~/deps_output.log 2>/dev/null || echo "Log deps kosong."
+            echo '```'
+            echo ""
+            echo "</details>"
+          } > summary.md
 
           cat summary.md >> $GITHUB_STEP_SUMMARY
 
@@ -390,5 +357,6 @@ jobs:
             /home/runner/report_${{ github.run_number }}.txt
             /home/runner/orangefox/out/target/product/X6855/vendor_boot.img
             /home/runner/orangefox/out/target/product/X6855/recovery.img
+            /home/runner/orangefox/out/target/product/X6855/boot.img
             /home/runner/orangefox/out/target/product/X6855/OrangeFox-*.zip
           if-no-files-found: ignore
