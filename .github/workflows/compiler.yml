@@ -49,6 +49,9 @@ jobs:
           cp -r $GITHUB_WORKSPACE/* $DT_DIR/ >> ~/inject_output.log 2>&1
           echo "Device tree berhasil disalin ke $DT_DIR" >> ~/inject_output.log
 
+          # Auto-patch semua file .mk agar penggantian OF_TARGET_DEVICES berjalan penuh
+          find $DT_DIR -type f -name "*.mk" -exec sed -i 's/OF_TARGET_DEVICES/FOX_TARGET_DEVICES/g' {} +
+
           # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib
           BOARD_CONFIG="$DT_DIR/BoardConfig.mk"
           if [ ! -f "$BOARD_CONFIG" ]; then
@@ -106,6 +109,9 @@ jobs:
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
           cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!" >> ~/compile_output.log; exit 1; }
           
+          # Patch tambahan pada source OrangeFox jika ada override dari environment
+          find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i 's/OF_TARGET_DEVICES/FOX_TARGET_DEVICES/g' {} + 2>/dev/null || true
+
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
           export LC_ALL="C"
@@ -205,7 +211,7 @@ jobs:
           3. LOG TAHAP KOMPILASI (BUILD)
           ========================================
           EOF
-          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log kompilasi kosong." >> $REPORT_FILE
+          cat ~/compile_output.log >> $REPORT_FILE 2>/dev/null || echo "Log compile kosong." >> $REPORT_FILE
 
           echo "" >> $REPORT_FILE
           echo "================================================================================" >> $REPORT_FILE
