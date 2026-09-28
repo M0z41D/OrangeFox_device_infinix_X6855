@@ -74,17 +74,17 @@ jobs:
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} +
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/OF_TARGET_DEVICES/d' {} +
 
-            # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib
+            # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib secara aman
             BOARD_CONFIG="$DT_DIR/BoardConfig.mk"
             if [ ! -f "$BOARD_CONFIG" ]; then
               touch "$BOARD_CONFIG"
             fi
             
-            grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG" \vert{}\vert{} echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
-            grep -q "TW_THEME" "$BOARD_CONFIG" \vert{}\vert{} echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"
-            grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"
-            grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"
-            grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"
+            if ! grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG"; then echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"; fi
+            if ! grep -q "TW_THEME" "$BOARD_CONFIG"; then echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"; fi
+            if ! grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG"; then echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"; fi
+            if ! grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG"; then echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"; fi
+            if ! grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG"; then echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"; fi
 
             # Hapus vendorsetup.sh untuk mencegah konflik lunch
             rm -f "$DT_DIR/vendorsetup.sh"
@@ -199,9 +199,6 @@ jobs:
           ICON_INJECT=$(get_icon "$INJECT_OUTCOME")
           ICON_COMPILE=$(get_icon "$COMPILE_OUTCOME")
 
-          # ---------------------------------------------------------
-          # 1. BUAT FILE REPORT TXT UTUH (UNTUK ARTIFACT)
-          # ---------------------------------------------------------
           cat << EOF > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD FULL DETAILED REPORT
@@ -242,10 +239,6 @@ jobs:
           fi
 
           cat << 'EOF' >> $REPORT_FILE
-
-          ================================================================================
-          [ IV. LOG EKSEKUSI LENGKAP SECARA KESELURUHAN (FULLY UNABRIDGED LOGS) ]
-          ================================================================================
 
           ========================================
           1. LOG MAXIMIZE SPACE
@@ -297,9 +290,6 @@ jobs:
           echo "================================================================================" >> $REPORT_FILE
           echo "AKHIR DARI LAPORAN UTUH AUTOMATED REPORT" >> $REPORT_FILE
 
-          # ---------------------------------------------------------
-          # 2. TAMPILKAN LAPORAN PADA HALAMAN SUMMARY GITHUB ACTIONS
-          # ---------------------------------------------------------
           cat << EOF > summary.md
           # 🦊 OrangeFox Recovery Build Full Report (#$RUN_NUM)
 
