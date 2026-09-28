@@ -63,7 +63,7 @@ TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
 # ==========================================
 # 6. ORANGEFOX RECOVERY SPECIFIC FLAGS
 # ==========================================
-FOX_VERSION := "R11.1_0"
+FOX_MAINTAINER_PATCH_VERSION := "0"
 FOX_BUILD_TYPE := "Unofficial"
 FOX_USE_BASH_SHELL := true
 FOX_ASH_IS_BASH := true
