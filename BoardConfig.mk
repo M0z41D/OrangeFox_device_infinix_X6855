@@ -6,6 +6,12 @@
 DEVICE_PATH := device/infinix/X6855
 
 # ==========================================
+# 0. BUILD SYSTEM & DEPENDENCIES FLAGS
+# ==========================================
+ALLOW_MISSING_DEPENDENCIES := true
+TARGET_RECOVERY_IS_REAL := true
+
+# ==========================================
 # 1. PLATFORM & ARCHITECTURE CONFIGURATION
 # ==========================================
 TARGET_ARCH := arm64
@@ -32,6 +38,10 @@ BOARD_KERNEL_BASE := 0x40000000
 BOARD_KERNEL_PAGESIZE := 2048
 BOARD_RAMDISK_OFFSET := 0x14000000
 BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb
+
+# Jika Anda tidak menaruh file kernel prebuilt di folder device tree,
+# hilangkan tanda pagar (#) pada baris di bawah ini:
+# TARGET_NO_KERNEL := true
 
 # ==========================================
 # 3. PARTITIONS & FILE SYSTEMS
@@ -66,6 +76,8 @@ TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
 # ==========================================
 # 6. ORANGEFOX RECOVERY SPECIFIC FLAGS
 # ==========================================
+FOX_BUILD_DEVICE := X6855
+OF_TARGET_DEVICES := X6855, fox_X6855
 FOX_MAINTAINER_PATCH_VERSION := 0
 FOX_BUILD_TYPE := "Unofficial"
 FOX_USE_BASH_SHELL := true
