@@ -148,7 +148,7 @@ jobs:
             exit 1
           fi
 
-      - name: Generate Detailed Report & Summary
+      - name: Generate Detailed Full Report
         if: always()
         env:
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
@@ -160,7 +160,6 @@ jobs:
           REPORT_FILE=~/report_${RUN_NUM}.txt
           BUILD_TIME="$(date)"
           
-          # Fungsi penentu indikator centang / silang
           get_icon() {
             if [ "$1" = "success" ]; then
               echo "✅ Sukses"
@@ -176,7 +175,7 @@ jobs:
           ICON_INJECT=$(get_icon "$INJECT_OUTCOME")
           ICON_COMPILE=$(get_icon "$COMPILE_OUTCOME")
 
-          # 1. TULIS REPORT DETAIL KE FILE TXT
+          # 1. BUAT FILE REPORT LENGKAP TXT (UNTUK ARTIFACT)
           cat << EOF > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD DETAILED REPORT
@@ -209,7 +208,7 @@ jobs:
           EOF
 
           if [ -f ~/compile_output.log ]; then
-            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci ralat standar." >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci ralat standar." >> $REPORT_FILE
           else
             echo "File log kompilasi tidak wujud." >> $REPORT_FILE
           fi
@@ -245,8 +244,8 @@ jobs:
           echo "================================================================================" >> $REPORT_FILE
           echo "AKHIR DARI LAPORAN OTOMATIS" >> $REPORT_FILE
 
-          # 2. TAMPILKAN LAPORAN VISUAL PADA GITHUB STEP SUMMARY
-          cat << EOF >> $GITHUB_STEP_SUMMARY
+          # 2. TAMPILKAN LAPORAN 100% UTUH PADA HALAMAN WEB GITHUB ACTIONS
+          cat << EOF > summary.md
           # 🦊 OrangeFox Recovery Build Report (#$RUN_NUM)
 
           ### 📊 Ringkasan Status Tahapan
@@ -258,9 +257,56 @@ jobs:
           | ⚙️ Compile Recovery | $ICON_COMPILE | Kompilasi image recovery |
 
           ---
-          **Target Device**: \`Infinix X6855\`  
-          **Waktu Eksekusi**: \`$BUILD_TIME\`  
+
+          ### 💾 Sumber Daya Sistem
+          \`\`\`
+          $(df -h | head -n 5)
+          \`\`\`
+          \`\`\`
+          $(free -h)
+          \`\`\`
+
+          ---
+
+          ### 🚨 Analisis Error Terdeteksi
+          \`\`\`
+          $(grep -iE "error:|FAILED|fatal:|ninja: build stopped|obsolete|\*\*\*" ~/compile_output.log 2>/dev/null | tail -n 25 || echo "Tidak ada error terdeteksi atau log belum terbuat.")
+          \`\`\`
+
+          ---
+
+          ### 📜 Log Eksekusi Lengkap (Klik Dropdown)
+
+          <details>
+          <summary>🔍 1. Log Sync Source</summary>
+
+          \`\`\`text
+          $(tail -n 100 ~/sync_output.log 2>/dev/null || echo "Log sync kosong.")
+          \`\`\`
+
+          </details>
+
+          <details>
+          <summary>🔍 2. Log Inject Device Tree</summary>
+
+          \`\`\`text
+          $(cat ~/inject_output.log 2>/dev/null || echo "Log inject kosong.")
+          \`\`\`
+
+          </details>
+
+          <details>
+          <summary>🔍 3. Log Compile Recovery (100 Baris Terakhir)</summary>
+
+          \`\`\`text
+          $(tail -n 100 ~/compile_output.log 2>/dev/null || echo "Log compile kosong.")
+          \`\`\`
+
+          </details>
+
           EOF
+
+          cat summary.md >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Artifact
         if: always()
