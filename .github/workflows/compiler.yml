@@ -57,6 +57,12 @@ jobs:
             touch ~/orangefox_sync/patch-vendor-twrp-fox_12.1.diff 2>/dev/null || true
             
             ./orangefox_sync.sh --branch 12.1 --path ~/orangefox
+
+            # Clone repositori vendor/fox jika tidak otomatis diunduh
+            if [ ! -d "$HOME/orangefox/vendor/fox" ]; then
+              echo "Cloning vendor/fox repository..."
+              git clone https://gitlab.com/OrangeFox/vendor/recovery.git -b fox_12.1 ~/orangefox/vendor/fox || true
+            fi
           } >> ~/sync_output.log 2>&1
 
       - name: Inject Device Tree & Patch Configs
@@ -73,6 +79,9 @@ jobs:
             # Hapus variabel usang FOX_TARGET_DEVICES & OF_TARGET_DEVICES
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} +
             find "$DT_DIR" -type f -name "*.mk" -exec sed -i '/OF_TARGET_DEVICES/d' {} +
+
+            # Ubah include vendor/fox menjadi safe-include (-include)
+            find "$DT_DIR" -type f -name "*.mk" -exec sed -i 's|^include vendor/fox/|-include vendor/fox/|g' {} +
 
             # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib secara aman
             BOARD_CONFIG="$DT_DIR/BoardConfig.mk"
@@ -137,6 +146,13 @@ jobs:
             
             # Hapus pemicu error FOX_TARGET_DEVICES dari source tree recovery
             find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} + 2>/dev/null || true
+
+            # Patch extraneous endif di bootable/recovery/orangefox.mk baris 311
+            OF_MK=~/orangefox/bootable/recovery/orangefox.mk
+            if [ -f "$OF_MK" ]; then
+              sed -i '311s/^endif/# endif/' "$OF_MK" 2>/dev/null || true
+              echo "Patch extraneous endif pada $OF_MK telah diterapkan."
+            fi
 
             export ALLOW_MISSING_DEPENDENCIES=true
             export FOX_BUILD_DEVICE="X6855"
