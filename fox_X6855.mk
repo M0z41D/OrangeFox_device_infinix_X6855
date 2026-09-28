@@ -5,8 +5,17 @@
 
 LOCAL_PATH := device/infinix/X6855
 
-# Inherit dari konfigurasi dasar OrangeFox
-$(call inherit-product, vendor/fox/config/common.mk)
+# Inherit dari konfigurasi dasar AOSP
+$(call inherit-product, $(SRC_TARGET_DIR)/product/aosp_base.mk)
+
+# Inherit dari konfigurasi dasar OrangeFox (Pengecekan Aman dengan Dynamic Fallback)
+ifneq ($(wildcard vendor/fox/config/common.mk),)
+    $(call inherit-product, vendor/fox/config/common.mk)
+else ifneq ($(wildcard vendor/pb/config/common.mk),)
+    $(call inherit-product, vendor/pb/config/common.mk)
+else ifneq ($(wildcard vendor/omni/config/common.mk),)
+    $(call inherit-product, vendor/omni/config/common.mk)
+endif
 
 # Identitas Produk & Perangkat
 PRODUCT_NAME := fox_X6855
@@ -15,14 +24,14 @@ PRODUCT_BRAND := Infinix
 PRODUCT_MODEL := Infinix X6855
 PRODUCT_MANUFACTURER := Infinix
 
-# Catatan: JANGAN gunakan FOX_TARGET_DEVICES (Obsolete).
-# Gunakan TARGET_DEVICE standar jika diperlukan.
+# Standard Target Device
 TARGET_DEVICE := X6855
 
 # OrangeFox Build Flags
 FOX_VERSION := R11.1_2
 FOX_BUILD_TYPE := Unofficially
-OF_MAINTAINER := "Mozaid"
+OF_MAINTAINER := Mozaid
+ALLOW_MISSING_DEPENDENCIES := true
 
 # Layar dan Tampilan UI
 OF_SCREEN_H := 2400
