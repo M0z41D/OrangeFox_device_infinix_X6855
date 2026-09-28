@@ -8,9 +8,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
+        id: checkout
         uses: actions/checkout@v4
 
       - name: Maximize Build Space
+        id: space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
@@ -19,11 +21,13 @@ jobs:
           sudo mkswap /swapfile && sudo swapon /swapfile
 
       - name: Install Dependencies
+        id: deps
         run: |
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32z1-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
 
       - name: Install Google Repo Tool
+        id: repo_tool
         run: |
           mkdir -p ~/bin
           curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
@@ -38,6 +42,10 @@ jobs:
           git config --global user.name "M0z41D"
           git config --global user.email "m0z41d@example.com"
           git clone https://gitlab.com/OrangeFox/sync.git . >> ~/sync_output.log 2>&1
+          
+          # Buat file stub patch agar skrip sync tidak error saat mencari patch-vendor-twrp
+          touch ~/orangefox_sync/patch-vendor-twrp-fox_12.1.diff 2>/dev/null || true
+          
           ./orangefox_sync.sh --branch 12.1 --path ~/orangefox >> ~/sync_output.log 2>&1
 
       - name: Inject Device Tree & Patch Configs
@@ -46,23 +54,24 @@ jobs:
           echo "=== 2. TAHAP INJECT DEVICE TREE & PATCH CONFIG ===" > ~/inject_output.log
           DT_DIR=~/orangefox/device/infinix/X6855
           mkdir -p $DT_DIR >> ~/inject_output.log 2>&1
-          cp -r $GITHUB_WORKSPACE/* $DT_DIR/ >> ~/inject_output.log 2>&1
+          cp -r $GITHUB_WORKSPACE/*$DT_DIR/ >> ~/inject_output.log 2>&1
           echo "Device tree berhasil disalin ke $DT_DIR" >> ~/inject_output.log
 
-          # Auto-patch semua file .mk agar penggantian OF_TARGET_DEVICES berjalan penuh
-          find $DT_DIR -type f -name "*.mk" -exec sed -i 's/OF_TARGET_DEVICES/FOX_TARGET_DEVICES/g' {} +
+          # HAPUS variabel usang FOX_TARGET_DEVICES & OF_TARGET_DEVICES agar tidak memicu obsolete error
+          find $DT_DIR -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} +
+          find $DT_DIR -type f -name "*.mk" -exec sed -i '/OF_TARGET_DEVICES/d' {} +
 
-          # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib
+          # Pastikan BoardConfig.mk ada dan tambahkan parameter wajib jika belum ada
           BOARD_CONFIG="$DT_DIR/BoardConfig.mk"
           if [ ! -f "$BOARD_CONFIG" ]; then
             touch "$BOARD_CONFIG"
           fi
           
-          grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG" || echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
-          grep -q "TW_THEME" "$BOARD_CONFIG" || echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"
-          grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG" || echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"
-          grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG" || echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"
-          grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG" || echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"
+          grep -q "BOARD_KERNEL_IMAGE_NAME" "$BOARD_CONFIG" \vert{}\vert{} echo "BOARD_KERNEL_IMAGE_NAME := Image.gz-dtb" >> "$BOARD_CONFIG"
+          grep -q "TW_THEME" "$BOARD_CONFIG" \vert{}\vert{} echo "TW_THEME := portrait_hdpi" >> "$BOARD_CONFIG"
+          grep -q "TARGET_SUPPORTS_64_BIT_APPS" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SUPPORTS_64_BIT_APPS := false" >> "$BOARD_CONFIG"
+          grep -q "TARGET_SCREEN_WIDTH" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SCREEN_WIDTH := 720" >> "$BOARD_CONFIG"
+          grep -q "TARGET_SCREEN_HEIGHT" "$BOARD_CONFIG" \vert{}\vert{} echo "TARGET_SCREEN_HEIGHT := 1600" >> "$BOARD_CONFIG"
 
           # Hapus vendorsetup.sh untuk mencegah konflik lunch
           rm -f "$DT_DIR/vendorsetup.sh"
@@ -83,7 +92,7 @@ jobs:
           # Buat fox_X6855.mk jika belum ada
           if [ ! -f "$DT_DIR/fox_X6855.mk" ]; then
             cat << 'EOF' > "$DT_DIR/fox_X6855.mk"
-          $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
+          $(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)
           PRODUCT_NAME := fox_X6855
           PRODUCT_DEVICE := X6855
           PRODUCT_MANUFACTURER := infinix
@@ -93,7 +102,7 @@ jobs:
           # Buat omni_X6855.mk jika belum ada
           if [ ! -f "$DT_DIR/omni_X6855.mk" ]; then
             cat << 'EOF' > "$DT_DIR/omni_X6855.mk"
-          $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
+          $(call inherit-product,$(SRC_TARGET_DIR)/product/full_base_telephony.mk)
           PRODUCT_NAME := omni_X6855
           PRODUCT_DEVICE := X6855
           PRODUCT_MANUFACTURER := infinix
@@ -109,8 +118,8 @@ jobs:
           echo "=== 3. TAHAP KOMPILASI RECOVERY ===" > ~/compile_output.log
           cd ~/orangefox || { echo "GAGAL: Direktori ~/orangefox tidak ditemukan!" >> ~/compile_output.log; exit 1; }
           
-          # Patch tambahan pada source OrangeFox jika ada override dari environment
-          find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i 's/OF_TARGET_DEVICES/FOX_TARGET_DEVICES/g' {} + 2>/dev/null || true
+          # Hapus pemicu error FOX_TARGET_DEVICES dari source tree recovery jika ada
+          find ~/orangefox/bootable/recovery -type f -name "*.mk" -exec sed -i '/FOX_TARGET_DEVICES/d' {} + 2>/dev/null || true
 
           export ALLOW_MISSING_DEPENDENCIES=true
           export FOX_BUILD_DEVICE="X6855"
@@ -131,7 +140,7 @@ jobs:
           echo "-> Memeriksa hasil file output build..." >> ~/compile_output.log
           OUT_DIR="/home/runner/orangefox/out/target/product/X6855"
           
-          if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] || ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
+          if [ -f "$OUT_DIR/recovery.img" ] || [ -f "$OUT_DIR/vendor_boot.img" ] \vert{}\vert{} ls $OUT_DIR/OrangeFox-*.zip 1> /dev/null 2>&1; then
             echo "SUKSES: File image OrangeFox ditemukan!" >> ~/compile_output.log
             exit 0
           else
@@ -139,9 +148,10 @@ jobs:
             exit 1
           fi
 
-      - name: Generate Detailed Report File
+      - name: Generate Detailed Report & Summary
         if: always()
         env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           SYNC_OUTCOME: ${{ steps.sync.outcome }}
           INJECT_OUTCOME: ${{ steps.inject.outcome }}
           COMPILE_OUTCOME: ${{ steps.compile.outcome }}
@@ -150,6 +160,23 @@ jobs:
           REPORT_FILE=~/report_${RUN_NUM}.txt
           BUILD_TIME="$(date)"
           
+          # Fungsi penentu indikator centang / silang
+          get_icon() {
+            if [ "$1" = "success" ]; then
+              echo "✅ Sukses"
+            elif [ "$1" = "skipped" ]; then
+              echo "⚠️ Dilewati"
+            else
+              echo "❌ Gagal"
+            fi
+          }
+
+          ICON_CHECKOUT=$(get_icon "$CHECKOUT_OUTCOME")
+          ICON_SYNC=$(get_icon "$SYNC_OUTCOME")
+          ICON_INJECT=$(get_icon "$INJECT_OUTCOME")
+          ICON_COMPILE=$(get_icon "$COMPILE_OUTCOME")
+
+          # 1. TULIS REPORT DETAIL KE FILE TXT
           cat << EOF > $REPORT_FILE
           ================================================================================
                                   ORANGEFOX BUILD DETAILED REPORT
@@ -160,9 +187,10 @@ jobs:
           --------------------------------------------------------------------------------
           
           [ I. RINGKASAN STATUS TAHAPAN ]
-          - Sync Source         : $SYNC_OUTCOME
-          - Inject Device Tree  : $INJECT_OUTCOME
-          - Compile Recovery    : $COMPILE_OUTCOME
+          - Checkout Code       : $ICON_CHECKOUT
+          - Sync Source         : $ICON_SYNC
+          - Inject Device Tree  : $ICON_INJECT
+          - Compile Recovery    : $ICON_COMPILE
           
           --------------------------------------------------------------------------------
           [ II. INFORMASI SUMBER DAYA SISTEM (DISK & RAM) ]
@@ -181,7 +209,7 @@ jobs:
           EOF
 
           if [ -f ~/compile_output.log ]; then
-            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci ralat standard." >> $REPORT_FILE
+            grep -iE "error:|FAILED|fatal:|ninja: build stopped" ~/compile_output.log >> $REPORT_FILE || echo "Tidak ditemukan kata kunci ralat standar." >> $REPORT_FILE
           else
             echo "File log kompilasi tidak wujud." >> $REPORT_FILE
           fi
@@ -216,6 +244,23 @@ jobs:
           echo "" >> $REPORT_FILE
           echo "================================================================================" >> $REPORT_FILE
           echo "AKHIR DARI LAPORAN OTOMATIS" >> $REPORT_FILE
+
+          # 2. TAMPILKAN LAPORAN VISUAL PADA GITHUB STEP SUMMARY
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          # 🦊 OrangeFox Recovery Build Report (#$RUN_NUM)
+
+          ### 📊 Ringkasan Status Tahapan
+          | Tahapan Build | Status | Detail |
+          | :--- | :---: | :--- |
+          | 🛠️ Checkout Code | $ICON_CHECKOUT | Ambil kode repositori |
+          | 🔄 Sync Source | $ICON_SYNC | Pull manifes OrangeFox 12.1 |
+          | 📁 Inject Device Tree | $ICON_INJECT | Konfigurasi Infinix X6855 |
+          | ⚙️ Compile Recovery | $ICON_COMPILE | Kompilasi image recovery |
+
+          ---
+          **Target Device**: \`Infinix X6855\`  
+          **Waktu Eksekusi**: \`$BUILD_TIME\`  
+          EOF
 
       - name: Upload Artifact
         if: always()
