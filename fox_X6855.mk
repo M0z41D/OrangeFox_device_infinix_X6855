@@ -17,20 +17,3 @@ PRODUCT_MODEL := X6855
 PRODUCT_MANUFACTURER := infinix
 
 PRODUCT_GMS_CLIENT_ID_BASE := android-infinix
-```[span_7](start_span)[span_7](end_span)
-
----
-
-#### 3. `device/infinix/X6855/AndroidProducts.mk`
-```make
-#
-# Copyright (C) 2026 The Android Open Source Project
-# SPDX-License-Identifier: Apache-2.0
-#
-
-PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/fox_X6855.mk
-
-COMMON_LUNCH_CHOICES := \
-    fox_X6855-eng \
-    fox_X6855-userdebug
